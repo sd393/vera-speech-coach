@@ -1,0 +1,150 @@
+import ffmpeg from 'fluent-ffmpeg'
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
+import fs from 'fs/promises'
+import { existsSync, statSync } from 'fs'
+import path from 'path'
+import os from 'os'
+import crypto from 'crypto'
+
+ffmpeg.setFfmpegPath(ffmpegInstaller.path)
+
+const WHISPER_MAX_SIZE = 25 * 1024 * 1024 // 25MB
+
+function tempPath(ext: string): string {
+  const id = crypto.randomBytes(8).toString('hex')
+  return path.join(os.tmpdir(), `vera-${id}${ext}`)
+}
+
+/**
+ * Extract and compress audio from a video or audio file to 64kbps mono mp3.
+ * This dramatically reduces file size — a 200MB video typically yields ~10MB of audio.
+ */
+export function extractAndCompressAudio(
+  inputPath: string,
+  outputPath: string
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .noVideo()
+      .audioCodec('libmp3lame')
+      .audioBitrate('64k')
+      .audioChannels(1)
+      .audioFrequency(16000)
+      .format('mp3')
+      .on('error', (err: Error) => reject(err))
+      .on('end', () => resolve())
+      .save(outputPath)
+  })
+}
+
+/**
+ * Get the duration of an audio file in seconds.
+ */
+function getAudioDuration(filePath: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(filePath, (err, metadata) => {
+      if (err) return reject(err)
+      resolve(metadata.format.duration ?? 0)
+    })
+  })
+}
+
+/**
+ * Split an audio file into chunks that each fit under the Whisper API size limit.
+ * Returns an array of file paths (in order). If the file is already small enough,
+ * returns a single-element array with the original path.
+ */
+export async function splitAudioIfNeeded(
+  filePath: string,
+  maxSizeBytes: number = WHISPER_MAX_SIZE
+): Promise<string[]> {
+  const stat = statSync(filePath)
+  if (stat.size <= maxSizeBytes) {
+    return [filePath]
+  }
+
+  const duration = await getAudioDuration(filePath)
+  // Estimate how many chunks we need based on size ratio
+  const numChunks = Math.ceil(stat.size / maxSizeBytes)
+  const chunkDuration = Math.floor(duration / numChunks)
+
+  const chunkPaths: string[] = []
+
+  for (let i = 0; i < numChunks; i++) {
+    const startTime = i * chunkDuration
+    const chunkPath = tempPath(`-chunk${i}.mp3`)
+    chunkPaths.push(chunkPath)
+
+    await new Promise<void>((resolve, reject) => {
+      let cmd = ffmpeg(filePath)
+        .setStartTime(startTime)
+        .audioCodec('libmp3lame')
+        .audioBitrate('64k')
+        .audioChannels(1)
+        .audioFrequency(16000)
+        .format('mp3')
+
+      // For all chunks except the last, set duration
+      if (i < numChunks - 1) {
+        cmd = cmd.setDuration(chunkDuration)
+      }
+
+      cmd
+        .on('error', (err: Error) => reject(err))
+        .on('end', () => resolve())
+        .save(chunkPath)
+    })
+  }
+
+  return chunkPaths
+}
+
+/**
+ * Write an uploaded File/Blob to a temp path on disk.
+ */
+export async function writeUploadToTmp(file: File): Promise<string> {
+  const ext = path.extname(file.name) || '.bin'
+  const tmpFile = tempPath(ext)
+  const buffer = Buffer.from(await file.arrayBuffer())
+  await fs.writeFile(tmpFile, buffer)
+  return tmpFile
+}
+
+/**
+ * Remove temp files. Silently ignores files that don't exist.
+ */
+export async function cleanupTempFiles(paths: string[]): Promise<void> {
+  await Promise.all(
+    paths.map((p) =>
+      fs.unlink(p).catch(() => {
+        // File may already be deleted or never created
+      })
+    )
+  )
+}
+
+/**
+ * Full pipeline: write file to disk, extract audio, split if needed.
+ * Returns the list of chunk paths ready for Whisper, plus all temp paths for cleanup.
+ */
+export async function processFileForWhisper(file: File): Promise<{
+  chunkPaths: string[]
+  allTempPaths: string[]
+}> {
+  const inputPath = await writeUploadToTmp(file)
+  const compressedPath = tempPath('.mp3')
+  const allTempPaths = [inputPath, compressedPath]
+
+  await extractAndCompressAudio(inputPath, compressedPath)
+
+  const chunkPaths = await splitAudioIfNeeded(compressedPath)
+
+  // If chunks were created (different from compressedPath), track them too
+  for (const cp of chunkPaths) {
+    if (cp !== compressedPath) {
+      allTempPaths.push(cp)
+    }
+  }
+
+  return { chunkPaths, allTempPaths }
+}

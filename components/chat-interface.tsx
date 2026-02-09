@@ -4,41 +4,8 @@ import React from "react"
 
 import { useState, useRef, useEffect, type FormEvent } from "react"
 import { Send, Paperclip, FileVideo, FileAudio, Loader2 } from "lucide-react"
-
-interface Attachment {
-  name: string
-  type: string
-  size: number
-}
-
-interface Message {
-  id: string
-  role: "user" | "assistant"
-  content: string
-  attachment?: Attachment
-}
-
-const VERA_RESPONSES = [
-  "Thanks for sharing that context. Who specifically will be in the room for this presentation? Understanding your audience will help me give you more targeted feedback.",
-  "That's a great starting point. I'd recommend structuring your key message around the outcome your audience cares about most. What's the one thing you want them to walk away remembering?",
-  "I've noted your setup. One thing I've seen with similar audiences is they tend to challenge the data early. Consider leading with your strongest evidence to build credibility from the start.",
-  "Interesting approach. Based on what you've told me about your audience, I'd suggest softening the technical jargon in the first few minutes. You want to build rapport before diving into specifics.",
-  "Good thinking. Let me simulate a likely reaction from your audience: they'll probably ask about ROI within the first five minutes. Do you have a clear, concise answer ready for that?",
-]
-
-const FILE_RESPONSE_INITIAL =
-  "I've received your recording. Give me a moment to analyze it..."
-
-const FILE_RESPONSE_FOLLOWUP =
-  "I've analyzed your recording. Here are my initial observations from the perspective of your target audience:\n\n1. Your opening is strong — you establish credibility within the first 30 seconds.\n2. Around the 2-minute mark, the pacing slows down. Consider tightening that section to maintain engagement.\n3. Your closing call-to-action could be more direct. Try ending with a specific next step rather than an open-ended question.\n4. Overall tone is confident and professional. Well done."
-
-let responseIndex = 0
-
-function getNextResponse(): string {
-  const response = VERA_RESPONSES[responseIndex % VERA_RESPONSES.length]
-  responseIndex++
-  return response
-}
+import { toast } from "sonner"
+import { useChat } from "@/hooks/use-chat"
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -46,89 +13,51 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function generateId(): string {
-  return Math.random().toString(36).substring(2, 11)
-}
-
 export function ChatInterface() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: generateId(),
-      role: "assistant",
-      content:
-        "Welcome to Vera. I'm your AI presentation coach. Tell me about the presentation you're preparing for — who's your audience, what's the context, and what are you hoping to achieve?",
-    },
-  ])
+  const {
+    messages,
+    isTranscribing,
+    isStreaming,
+    error,
+    sendMessage,
+    uploadFile,
+    clearError,
+  } = useChat()
+
   const [input, setInput] = useState("")
-  const [isTyping, setIsTyping] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const isBusy = isTranscribing || isStreaming
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [messages, isTyping])
+  }, [messages, isTranscribing, isStreaming])
 
-  function addAssistantMessage(content: string) {
-    setMessages((prev) => [
-      ...prev,
-      { id: generateId(), role: "assistant", content },
-    ])
-  }
-
-  async function simulateResponse(isFileUpload: boolean) {
-    setIsTyping(true)
-
-    if (isFileUpload) {
-      await new Promise((r) => setTimeout(r, 800))
-      setIsTyping(false)
-      addAssistantMessage(FILE_RESPONSE_INITIAL)
-
-      setIsTyping(true)
-      await new Promise((r) => setTimeout(r, 2000))
-      setIsTyping(false)
-      addAssistantMessage(FILE_RESPONSE_FOLLOWUP)
-    } else {
-      const delay = 500 + Math.random() * 500
-      await new Promise((r) => setTimeout(r, delay))
-      setIsTyping(false)
-      addAssistantMessage(getNextResponse())
+  // Show errors as toasts
+  useEffect(() => {
+    if (error) {
+      toast.error(error)
+      clearError()
     }
-  }
+  }, [error, clearError])
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const trimmed = input.trim()
-    if (!trimmed) return
+    if (!trimmed || isBusy) return
 
-    setMessages((prev) => [
-      ...prev,
-      { id: generateId(), role: "user", content: trimmed },
-    ])
     setInput("")
-    simulateResponse(false)
+    sendMessage(trimmed)
   }
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: generateId(),
-        role: "user",
-        content: `Uploaded a file for review`,
-        attachment: {
-          name: file.name,
-          type: file.type,
-          size: file.size,
-        },
-      },
-    ])
-
-    simulateResponse(true)
+    uploadFile(file)
 
     // Reset the file input
     if (fileInputRef.current) {
@@ -182,18 +111,35 @@ export function ChatInterface() {
             </div>
           ))}
 
-          {/* Typing indicator */}
-          {isTyping && (
+          {/* Transcription indicator */}
+          {isTranscribing && (
             <div className="flex justify-start">
-              <div className="rounded-2xl rounded-bl-md border border-border/60 bg-card px-5 py-3">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:0ms]" />
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:150ms]" />
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:300ms]" />
+              <div className="rounded-2xl rounded-bl-md border border-border/60 bg-card px-5 py-3 text-card-foreground">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    Transcribing your recording...
+                  </span>
                 </div>
               </div>
             </div>
           )}
+
+          {/* Streaming indicator — shown only when streaming hasn't produced content yet */}
+          {isStreaming &&
+            messages.length > 0 &&
+            messages[messages.length - 1].role === "assistant" &&
+            messages[messages.length - 1].content === "" && (
+              <div className="flex justify-start">
+                <div className="rounded-2xl rounded-bl-md border border-border/60 bg-card px-5 py-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:0ms]" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:150ms]" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:300ms]" />
+                  </div>
+                </div>
+              </div>
+            )}
         </div>
       </div>
 
@@ -215,7 +161,7 @@ export function ChatInterface() {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isTyping}
+            disabled={isBusy}
             className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
             aria-label="Attach a file"
           >
@@ -235,7 +181,7 @@ export function ChatInterface() {
               }}
               placeholder="Type your message..."
               rows={1}
-              disabled={isTyping}
+              disabled={isBusy}
               className="w-full resize-none rounded-lg border border-input bg-card px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             />
           </div>
@@ -243,11 +189,11 @@ export function ChatInterface() {
           {/* Send button */}
           <button
             type="submit"
-            disabled={!input.trim() || isTyping}
+            disabled={!input.trim() || isBusy}
             className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-md shadow-primary/20 transition-all hover:bg-primary/90 disabled:opacity-50 disabled:shadow-none"
             aria-label="Send message"
           >
-            {isTyping ? (
+            {isBusy ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Send className="h-4 w-4" />
