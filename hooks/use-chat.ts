@@ -246,7 +246,7 @@ export function useChat() {
         const response = await fetch('/api/transcribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ blobUrl: blob.url, fileName: file.name }),
+          body: JSON.stringify({ blobUrl: blob.url, fileName: fileToUpload.name }),
           signal: controller.signal,
         })
 
