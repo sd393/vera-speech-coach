@@ -9,6 +9,7 @@ import crypto from 'crypto'
 ffmpeg.setFfmpegPath(ffmpegInstaller.path)
 
 const WHISPER_MAX_SIZE = 25 * 1024 * 1024 // 25MB
+const MAX_CHUNK_DURATION = 1400 // seconds — gpt-4o-mini-transcribe limit is 1500s
 
 function tempPath(ext: string): string {
   const id = crypto.randomBytes(8).toString('hex')
@@ -59,13 +60,16 @@ export async function splitAudioIfNeeded(
   maxSizeBytes: number = WHISPER_MAX_SIZE
 ): Promise<string[]> {
   const stat = statSync(filePath)
-  if (stat.size <= maxSizeBytes) {
+  const duration = await getAudioDuration(filePath)
+
+  const sizeChunks = Math.ceil(stat.size / maxSizeBytes)
+  const durationChunks = Math.ceil(duration / MAX_CHUNK_DURATION)
+  const numChunks = Math.max(sizeChunks, durationChunks)
+
+  if (numChunks <= 1) {
     return [filePath]
   }
 
-  const duration = await getAudioDuration(filePath)
-  // Estimate how many chunks we need based on size ratio
-  const numChunks = Math.ceil(stat.size / maxSizeBytes)
   const chunkDuration = Math.floor(duration / numChunks)
 
   const chunkPaths: string[] = []

@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { upload } from '@vercel/blob/client'
 import { validateFile } from '@/backend/validation'
+import { shouldExtractClientSide, extractAudioClientSide } from '@/lib/client-audio'
 
 interface Attachment {
   name: string
@@ -31,6 +32,7 @@ const INITIAL_MESSAGE: Message = {
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE])
   const [transcript, setTranscript] = useState<string | null>(null)
+  const [isCompressing, setIsCompressing] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -224,8 +226,19 @@ export function useChat() {
       abortControllerRef.current = controller
 
       try {
+        // For large videos, extract audio client-side to reduce upload size
+        let fileToUpload: File = file
+        if (shouldExtractClientSide(file)) {
+          setIsCompressing(true)
+          const compressed = await extractAudioClientSide(file)
+          setIsCompressing(false)
+          if (compressed) {
+            fileToUpload = compressed
+          }
+        }
+
         // Upload file directly to Vercel Blob (bypasses serverless body limit)
-        const blob = await upload(file.name, file, {
+        const blob = await upload(fileToUpload.name, fileToUpload, {
           access: 'public',
           handleUploadUrl: '/api/upload',
         })
@@ -253,6 +266,7 @@ export function useChat() {
         // Automatically trigger a chat response now that we have the transcript
         await streamChatResponse(updatedMessages, newTranscript)
       } catch (err: unknown) {
+        setIsCompressing(false)
         if (err instanceof Error && err.name === 'AbortError') {
           setIsTranscribing(false)
           return
@@ -274,6 +288,7 @@ export function useChat() {
     abortInFlight()
     setMessages([INITIAL_MESSAGE])
     setTranscript(null)
+    setIsCompressing(false)
     setIsTranscribing(false)
     setIsStreaming(false)
     setError(null)
@@ -282,6 +297,7 @@ export function useChat() {
   return {
     messages,
     transcript,
+    isCompressing,
     isTranscribing,
     isStreaming,
     error,

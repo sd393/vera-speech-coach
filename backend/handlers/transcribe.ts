@@ -39,20 +39,41 @@ export async function handleTranscribe(request: NextRequest) {
     const { chunkPaths, allTempPaths } = await processFileForWhisper(inputPath)
     tempPaths = allTempPaths
 
-    // Transcribe each chunk
+    // Transcribe chunks in parallel (capped at 3 concurrent requests)
     const client = openai()
-    const transcriptParts: string[] = []
+    const MAX_CONCURRENCY = 3
 
-    for (const chunkPath of chunkPaths) {
-      const fileStream = fs.createReadStream(chunkPath)
-      const transcription = await client.audio.transcriptions.create({
-        model: 'whisper-1',
-        file: fileStream,
-        response_format: 'text',
-      })
-      transcriptParts.push(transcription as unknown as string)
+    async function transcribeWithConcurrencyLimit(
+      paths: string[],
+      limit: number
+    ): Promise<string[]> {
+      const results: string[] = new Array(paths.length)
+      let nextIndex = 0
+
+      async function worker() {
+        while (nextIndex < paths.length) {
+          const i = nextIndex++
+          const fileStream = fs.createReadStream(paths[i])
+          const transcription = await client.audio.transcriptions.create({
+            model: 'gpt-4o-mini-transcribe',
+            file: fileStream,
+          })
+          results[i] = transcription.text
+        }
+      }
+
+      const workers = Array.from(
+        { length: Math.min(limit, paths.length) },
+        () => worker()
+      )
+      await Promise.all(workers)
+      return results
     }
 
+    const transcriptParts = await transcribeWithConcurrencyLimit(
+      chunkPaths,
+      MAX_CONCURRENCY
+    )
     const transcript = transcriptParts.join(' ')
 
     return NextResponse.json({ transcript })

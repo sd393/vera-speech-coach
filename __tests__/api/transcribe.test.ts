@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const mockTranscriptionCreate = vi.fn().mockResolvedValue('This is the transcribed text.')
+const mockTranscriptionCreate = vi.fn().mockResolvedValue({ text: 'This is the transcribed text.' })
 
 vi.mock('@/backend/openai', () => ({
   openai: vi.fn(() => ({
@@ -55,7 +55,7 @@ describe('POST /api/transcribe', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(checkRateLimit).mockReturnValue({ allowed: true })
-    mockTranscriptionCreate.mockResolvedValue('This is the transcribed text.')
+    mockTranscriptionCreate.mockResolvedValue({ text: 'This is the transcribed text.' })
     vi.mocked(downloadToTmp).mockResolvedValue('/tmp/vera-test-input.mp4')
     vi.mocked(processFileForWhisper).mockResolvedValue({
       chunkPaths: ['/tmp/vera-test-chunk0.mp3'],

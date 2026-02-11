@@ -17,6 +17,7 @@ function formatFileSize(bytes: number): string {
 export function ChatInterface() {
   const {
     messages,
+    isCompressing,
     isTranscribing,
     isStreaming,
     error,
@@ -29,7 +30,7 @@ export function ChatInterface() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const isBusy = isTranscribing || isStreaming
+  const isBusy = isCompressing || isTranscribing || isStreaming
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -118,8 +119,22 @@ export function ChatInterface() {
             </div>
           ))}
 
+          {/* Compressing indicator */}
+          {isCompressing && (
+            <div className="flex justify-start">
+              <div className="rounded-2xl rounded-bl-md border border-border/60 bg-card px-5 py-3 text-card-foreground">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    Compressing audio...
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Transcription indicator */}
-          {isTranscribing && (
+          {isTranscribing && !isCompressing && (
             <div className="flex justify-start">
               <div className="rounded-2xl rounded-bl-md border border-border/60 bg-card px-5 py-3 text-card-foreground">
                 <div className="flex items-center gap-2">
