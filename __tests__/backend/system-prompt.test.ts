@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildSystemPrompt } from '@/lib/system-prompt'
+import { buildSystemPrompt } from '@/backend/system-prompt'
 
 describe('buildSystemPrompt', () => {
   it('returns welcome/upload prompt when no transcript provided', () => {

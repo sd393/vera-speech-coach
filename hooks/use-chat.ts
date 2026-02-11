@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useCallback } from 'react'
-import { validateFile } from '@/lib/validation'
+import { validateFile } from '@/backend/validation'
 
 interface Attachment {
   name: string

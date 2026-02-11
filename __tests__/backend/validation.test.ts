@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateFile, chatRequestSchema, sanitizeInput } from '@/lib/validation'
+import { validateFile, chatRequestSchema, sanitizeInput } from '@/backend/validation'
 
 describe('validateFile', () => {
   it('rejects files over 500MB', () => {

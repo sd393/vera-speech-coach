@@ -11,7 +11,7 @@ function createMockStream() {
 
 const mockCreate = vi.fn().mockImplementation(() => createMockStream())
 
-vi.mock('@/lib/openai', () => ({
+vi.mock('@/backend/openai', () => ({
   openai: vi.fn(() => ({
     chat: {
       completions: {
@@ -21,14 +21,14 @@ vi.mock('@/lib/openai', () => ({
   })),
 }))
 
-vi.mock('@/lib/rate-limit', () => ({
+vi.mock('@/backend/rate-limit', () => ({
   checkRateLimit: vi.fn().mockReturnValue({ allowed: true }),
   getClientIp: vi.fn().mockReturnValue('127.0.0.1'),
 }))
 
 import { POST } from '@/app/api/chat/route'
 import { NextRequest } from 'next/server'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { checkRateLimit } from '@/backend/rate-limit'
 
 function createRequest(body: object): NextRequest {
   return new NextRequest('http://localhost/api/chat', {

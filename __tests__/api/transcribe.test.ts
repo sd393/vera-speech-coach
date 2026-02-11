@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockTranscriptionCreate = vi.fn().mockResolvedValue('This is the transcribed text.')
 
-vi.mock('@/lib/openai', () => ({
+vi.mock('@/backend/openai', () => ({
   openai: vi.fn(() => ({
     audio: {
       transcriptions: {
@@ -12,7 +12,7 @@ vi.mock('@/lib/openai', () => ({
   })),
 }))
 
-vi.mock('@/lib/audio', () => ({
+vi.mock('@/backend/audio', () => ({
   processFileForWhisper: vi.fn().mockResolvedValue({
     chunkPaths: ['/tmp/vera-test-chunk0.mp3'],
     allTempPaths: ['/tmp/vera-test-input.mp4', '/tmp/vera-test-compressed.mp3', '/tmp/vera-test-chunk0.mp3'],
@@ -20,7 +20,7 @@ vi.mock('@/lib/audio', () => ({
   cleanupTempFiles: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/rate-limit', () => ({
+vi.mock('@/backend/rate-limit', () => ({
   checkRateLimit: vi.fn().mockReturnValue({ allowed: true }),
   getClientIp: vi.fn().mockReturnValue('127.0.0.1'),
 }))
@@ -34,8 +34,8 @@ vi.mock('fs', () => ({
 
 import { POST } from '@/app/api/transcribe/route'
 import { NextRequest } from 'next/server'
-import { checkRateLimit } from '@/lib/rate-limit'
-import { processFileForWhisper } from '@/lib/audio'
+import { checkRateLimit } from '@/backend/rate-limit'
+import { processFileForWhisper } from '@/backend/audio'
 
 function createRequest(file?: File): NextRequest {
   const formData = new FormData()
@@ -119,7 +119,7 @@ describe('POST /api/transcribe', () => {
   })
 
   it('cleans up temp files even on error', async () => {
-    const { cleanupTempFiles } = await import('@/lib/audio')
+    const { cleanupTempFiles } = await import('@/backend/audio')
     mockTranscriptionCreate.mockRejectedValueOnce(new Error('API error'))
 
     const file = new File(['audio content'], 'test.mp4', {
