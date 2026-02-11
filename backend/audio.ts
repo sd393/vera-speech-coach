@@ -60,17 +60,19 @@ export async function splitAudioIfNeeded(
   maxSizeBytes: number = WHISPER_MAX_SIZE
 ): Promise<string[]> {
   const stat = statSync(filePath)
-  const duration = await getAudioDuration(filePath)
+  // Estimate duration from file size — the input is always our 64kbps MP3,
+  // so duration ≈ fileSize / 8000. This avoids needing ffprobe on Vercel.
+  const estimatedDuration = stat.size / 8000
 
   const sizeChunks = Math.ceil(stat.size / maxSizeBytes)
-  const durationChunks = Math.ceil(duration / MAX_CHUNK_DURATION)
+  const durationChunks = Math.ceil(estimatedDuration / MAX_CHUNK_DURATION)
   const numChunks = Math.max(sizeChunks, durationChunks)
 
   if (numChunks <= 1) {
     return [filePath]
   }
 
-  const chunkDuration = Math.floor(duration / numChunks)
+  const chunkDuration = Math.floor(estimatedDuration / numChunks)
 
   const chunkPaths: string[] = []
 
