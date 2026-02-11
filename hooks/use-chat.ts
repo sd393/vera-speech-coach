@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useCallback } from 'react'
+import { upload } from '@vercel/blob/client'
 import { validateFile } from '@/backend/validation'
 
 interface Attachment {
@@ -223,12 +224,16 @@ export function useChat() {
       abortControllerRef.current = controller
 
       try {
-        const formData = new FormData()
-        formData.append('file', file)
+        // Upload file directly to Vercel Blob (bypasses serverless body limit)
+        const blob = await upload(file.name, file, {
+          access: 'public',
+          handleUploadUrl: '/api/upload',
+        })
 
         const response = await fetch('/api/transcribe', {
           method: 'POST',
-          body: formData,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ blobUrl: blob.url, fileName: file.name }),
           signal: controller.signal,
         })
 

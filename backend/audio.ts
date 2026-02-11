@@ -111,6 +111,21 @@ export async function writeUploadToTmp(file: File): Promise<string> {
 }
 
 /**
+ * Download a file from a URL to a temp path on disk.
+ */
+export async function downloadToTmp(url: string, fileName: string): Promise<string> {
+  const ext = path.extname(fileName) || '.bin'
+  const tmpFile = tempPath(ext)
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Failed to download file: ${response.status}`)
+  }
+  const buffer = Buffer.from(await response.arrayBuffer())
+  await fs.writeFile(tmpFile, buffer)
+  return tmpFile
+}
+
+/**
  * Remove temp files. Silently ignores files that don't exist.
  */
 export async function cleanupTempFiles(paths: string[]): Promise<void> {
@@ -124,14 +139,15 @@ export async function cleanupTempFiles(paths: string[]): Promise<void> {
 }
 
 /**
- * Full pipeline: write file to disk, extract audio, split if needed.
+ * Full pipeline: extract audio from a file already on disk, compress, split if needed.
  * Returns the list of chunk paths ready for Whisper, plus all temp paths for cleanup.
+ *
+ * @param inputPath - Path to the file already on disk
  */
-export async function processFileForWhisper(file: File): Promise<{
+export async function processFileForWhisper(inputPath: string): Promise<{
   chunkPaths: string[]
   allTempPaths: string[]
 }> {
-  const inputPath = await writeUploadToTmp(file)
   const compressedPath = tempPath('.mp3')
   const allTempPaths = [inputPath, compressedPath]
 

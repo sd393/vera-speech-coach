@@ -49,6 +49,11 @@ export const chatRequestSchema = z.object({
   transcript: z.string().max(100_000).optional(),
 })
 
+export const transcribeRequestSchema = z.object({
+  blobUrl: z.string().url(),
+  fileName: z.string().min(1).max(255),
+})
+
 export function sanitizeInput(text: string): string {
   return text.trim()
 }

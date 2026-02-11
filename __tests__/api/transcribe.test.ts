@@ -13,6 +13,7 @@ vi.mock('@/backend/openai', () => ({
 }))
 
 vi.mock('@/backend/audio', () => ({
+  downloadToTmp: vi.fn().mockResolvedValue('/tmp/vera-test-input.mp4'),
   processFileForWhisper: vi.fn().mockResolvedValue({
     chunkPaths: ['/tmp/vera-test-chunk0.mp3'],
     allTempPaths: ['/tmp/vera-test-input.mp4', '/tmp/vera-test-compressed.mp3', '/tmp/vera-test-chunk0.mp3'],
@@ -25,6 +26,10 @@ vi.mock('@/backend/rate-limit', () => ({
   getClientIp: vi.fn().mockReturnValue('127.0.0.1'),
 }))
 
+vi.mock('@vercel/blob', () => ({
+  del: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('fs', () => ({
   default: {
     createReadStream: vi.fn().mockReturnValue('mock-stream'),
@@ -35,16 +40,14 @@ vi.mock('fs', () => ({
 import { POST } from '@/app/api/transcribe/route'
 import { NextRequest } from 'next/server'
 import { checkRateLimit } from '@/backend/rate-limit'
-import { processFileForWhisper } from '@/backend/audio'
+import { downloadToTmp, processFileForWhisper } from '@/backend/audio'
+import { del } from '@vercel/blob'
 
-function createRequest(file?: File): NextRequest {
-  const formData = new FormData()
-  if (file) {
-    formData.append('file', file)
-  }
+function createRequest(body?: Record<string, unknown>): NextRequest {
   return new NextRequest('http://localhost/api/transcribe', {
     method: 'POST',
-    body: formData,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body ?? {}),
   })
 }
 
@@ -53,36 +56,35 @@ describe('POST /api/transcribe', () => {
     vi.clearAllMocks()
     vi.mocked(checkRateLimit).mockReturnValue({ allowed: true })
     mockTranscriptionCreate.mockResolvedValue('This is the transcribed text.')
+    vi.mocked(downloadToTmp).mockResolvedValue('/tmp/vera-test-input.mp4')
     vi.mocked(processFileForWhisper).mockResolvedValue({
       chunkPaths: ['/tmp/vera-test-chunk0.mp3'],
       allTempPaths: ['/tmp/vera-test-input.mp4', '/tmp/vera-test-compressed.mp3'],
     })
   })
 
-  it('returns 400 when no file is provided', async () => {
-    const request = createRequest()
+  it('returns 400 when body is invalid', async () => {
+    const request = createRequest({})
     const response = await POST(request)
     expect(response.status).toBe(400)
 
     const body = await response.json()
-    expect(body.error).toContain('No file')
+    expect(body.error).toContain('Invalid request')
   })
 
-  it('returns 415 when file type is unsupported', async () => {
-    const file = new File(['content'], 'doc.pdf', { type: 'application/pdf' })
-
-    const request = createRequest(file)
+  it('returns 400 when blobUrl is not a valid URL', async () => {
+    const request = createRequest({ blobUrl: 'not-a-url', fileName: 'test.mp4' })
     const response = await POST(request)
-    expect(response.status).toBe(415)
+    expect(response.status).toBe(400)
   })
 
   it('returns 429 when rate limited', async () => {
     vi.mocked(checkRateLimit).mockReturnValue({ allowed: false })
 
-    const file = new File(['audio content'], 'test.mp3', {
-      type: 'audio/mpeg',
+    const request = createRequest({
+      blobUrl: 'https://example.vercel-storage.com/test.mp4',
+      fileName: 'test.mp4',
     })
-    const request = createRequest(file)
     const response = await POST(request)
     expect(response.status).toBe(429)
 
@@ -91,26 +93,30 @@ describe('POST /api/transcribe', () => {
   })
 
   it('returns transcript on successful transcription', async () => {
-    const file = new File(['audio content'], 'presentation.mp4', {
-      type: 'video/mp4',
+    const request = createRequest({
+      blobUrl: 'https://example.vercel-storage.com/presentation.mp4',
+      fileName: 'presentation.mp4',
     })
 
-    const request = createRequest(file)
     const response = await POST(request)
     expect(response.status).toBe(200)
 
     const body = await response.json()
     expect(body.transcript).toBe('This is the transcribed text.')
+    expect(downloadToTmp).toHaveBeenCalledWith(
+      'https://example.vercel-storage.com/presentation.mp4',
+      'presentation.mp4'
+    )
   })
 
   it('returns 500 on OpenAI API failure', async () => {
     mockTranscriptionCreate.mockRejectedValueOnce(new Error('API error'))
 
-    const file = new File(['audio content'], 'test.mp4', {
-      type: 'video/mp4',
+    const request = createRequest({
+      blobUrl: 'https://example.vercel-storage.com/test.mp4',
+      fileName: 'test.mp4',
     })
 
-    const request = createRequest(file)
     const response = await POST(request)
     expect(response.status).toBe(500)
 
@@ -122,13 +128,24 @@ describe('POST /api/transcribe', () => {
     const { cleanupTempFiles } = await import('@/backend/audio')
     mockTranscriptionCreate.mockRejectedValueOnce(new Error('API error'))
 
-    const file = new File(['audio content'], 'test.mp4', {
-      type: 'video/mp4',
+    const request = createRequest({
+      blobUrl: 'https://example.vercel-storage.com/test.mp4',
+      fileName: 'test.mp4',
     })
 
-    const request = createRequest(file)
     await POST(request)
 
     expect(cleanupTempFiles).toHaveBeenCalled()
+  })
+
+  it('deletes blob after processing', async () => {
+    const request = createRequest({
+      blobUrl: 'https://example.vercel-storage.com/test.mp4',
+      fileName: 'test.mp4',
+    })
+
+    await POST(request)
+
+    expect(del).toHaveBeenCalledWith('https://example.vercel-storage.com/test.mp4')
   })
 })
