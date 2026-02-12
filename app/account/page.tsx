@@ -119,12 +119,15 @@ export default function AccountPage() {
                 3 presentations per month
               </p>
             </div>
-            <a
-              href="/premium"
-              className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
-            >
-              Upgrade
-            </a>
+            <div className="flex flex-col items-end gap-1">
+              <button
+                disabled
+                className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Upgrade
+              </button>
+              <p className="text-xs text-muted-foreground">Coming soon</p>
+            </div>
           </div>
         </div>
 
