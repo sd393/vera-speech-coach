@@ -1,13 +1,34 @@
 "use client"
 
-import { useState } from "react"
-import { User, Mail, Lock, CreditCard, LogOut } from "lucide-react"
+import { useEffect } from "react"
+import { User, Mail, CreditCard, LogOut } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function AccountPage() {
   const router = useRouter()
-  const [name, setName] = useState("Jane Doe")
-  const [email, setEmail] = useState("jane@example.com")
+  const { user, loading, signOut } = useAuth()
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login")
+    }
+  }, [loading, user, router])
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    )
+  }
+
+  if (!user) return null
+
+  async function handleSignOut() {
+    await signOut()
+    router.push("/")
+  }
 
   return (
     <div className="relative min-h-screen px-6 py-24">
@@ -52,67 +73,27 @@ export default function AccountPage() {
             </div>
           </div>
 
-          <form
-            onSubmit={(e) => e.preventDefault()}
-            className="mt-6 flex flex-col gap-5"
-          >
+          <div className="mt-6 flex flex-col gap-5">
             <div className="flex flex-col gap-1.5">
-              <label
-                htmlFor="name"
-                className="flex items-center gap-2 text-sm font-medium text-foreground"
-              >
+              <span className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <User className="h-3.5 w-3.5 text-muted-foreground" />
                 Name
-              </label>
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              />
+              </span>
+              <p className="rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground">
+                {user.displayName || "—"}
+              </p>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label
-                htmlFor="email"
-                className="flex items-center gap-2 text-sm font-medium text-foreground"
-              >
+              <span className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                 Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              />
+              </span>
+              <p className="rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground">
+                {user.email || "—"}
+              </p>
             </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label
-                htmlFor="password"
-                className="flex items-center gap-2 text-sm font-medium text-foreground"
-              >
-                <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                className="rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="mt-2 self-start rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              Save Changes
-            </button>
-          </form>
+          </div>
         </div>
 
         {/* Subscription section */}
@@ -150,7 +131,7 @@ export default function AccountPage() {
         {/* Sign out */}
         <div className="mt-8">
           <button
-            onClick={() => router.push("/")}
+            onClick={handleSignOut}
             className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-destructive"
           >
             <LogOut className="h-4 w-4" />
