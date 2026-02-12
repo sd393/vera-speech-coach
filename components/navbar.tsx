@@ -7,8 +7,6 @@ import { useAuth } from "@/contexts/auth-context"
 const baseLinks = [
   { label: "About", href: "#about" },
   { label: "Presentation", href: "#how-it-works" },
-  { label: "Resume", href: "#" },
-  { label: "Premium", href: "#" },
 ]
 
 export function Navbar() {
