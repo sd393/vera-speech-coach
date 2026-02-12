@@ -118,17 +118,30 @@ export async function writeUploadToTmp(file: File): Promise<string> {
 
 /**
  * Download a file from a URL to a temp path on disk.
+ * Retries on failure to handle CDN propagation delays after Vercel Blob uploads.
  */
 export async function downloadToTmp(url: string, fileName: string): Promise<string> {
   const ext = path.extname(fileName) || '.bin'
   const tmpFile = tempPath(ext)
-  const response = await fetch(url)
-  if (!response.ok) {
-    throw new Error(`Failed to download file: ${response.status}`)
+
+  const MAX_RETRIES = 3
+  const RETRY_DELAY_MS = 2000
+
+  let lastStatus = 0
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
+    }
+    const response = await fetch(url)
+    if (response.ok) {
+      const buffer = Buffer.from(await response.arrayBuffer())
+      await fs.writeFile(tmpFile, buffer)
+      return tmpFile
+    }
+    lastStatus = response.status
   }
-  const buffer = Buffer.from(await response.arrayBuffer())
-  await fs.writeFile(tmpFile, buffer)
-  return tmpFile
+
+  throw new Error(`Failed to download file: ${lastStatus}`)
 }
 
 /**
