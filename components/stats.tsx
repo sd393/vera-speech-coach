@@ -1,8 +1,8 @@
 const stats = [
   {
-    value: "10+",
+    value: "Unlimited",
     label: "Audience Personas",
-    description: "Simulated audience archetypes covering industries, roles, and temperaments",
+    description: "Automatically simulates your audience via meta-prompting and user-provided context",
   },
   {
     value: "92%",
@@ -10,14 +10,14 @@ const stats = [
     description: "Of users reported feeling significantly more confident after using Vera",
   },
   {
-    value: "500+",
+    value: "50+",
     label: "Presentations Coached",
     description: "High-stakes presentations refined through AI-driven audience simulation",
   },
   {
     value: "4.8/5",
     label: "Average Rating",
-    description: "Rated by professionals across consulting, tech, finance, and academia",
+    description: "Rated by pilot users and professionals across consulting, tech, finance, and academia",
   },
 ]
 
