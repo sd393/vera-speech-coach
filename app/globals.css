@@ -50,3 +50,8 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Smooth scroll for anchor links */
+html {
+  scroll-behavior: smooth;
+}

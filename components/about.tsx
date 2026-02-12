@@ -1,65 +1,66 @@
+"use client"
+
+import { ScrollReveal, useParallax, motion } from "@/components/motion"
+
+const features = [
+  { word: "Audience-aware", accent: "hsl(192 80% 55%)" },
+  { word: "Context-driven", accent: "hsl(165 55% 50%)" },
+  { word: "Personalized", accent: "hsl(210 70% 60%)" },
+  { word: "High-stakes ready", accent: "hsl(192 91% 36%)" },
+]
+
 export function About() {
+  const { ref, med } = useParallax()
+
   return (
-    <section id="about" className="px-6 py-24 md:py-32">
-      <div className="mx-auto max-w-4xl">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-balance text-3xl font-bold tracking-tight text-foreground md:text-5xl">
-            Not just any another generic coach
+    <section id="about" ref={ref} className="relative overflow-hidden px-6 py-32 md:py-44">
+      {/* Parallax glow */}
+      <motion.div
+        style={{ y: med }}
+        className="pointer-events-none absolute -right-40 -top-20 -z-10 h-[500px] w-[500px] rounded-full opacity-10 blur-3xl"
+        aria-hidden="true"
+      >
+        <div
+          className="h-full w-full rounded-full"
+          style={{ background: "radial-gradient(circle, hsl(192 80% 55%), transparent 70%)" }}
+        />
+      </motion.div>
+
+      <div className="mx-auto max-w-5xl">
+        <ScrollReveal direction="up" distance={40}>
+          <h2 className="max-w-lg text-3xl font-bold tracking-tight text-foreground md:text-5xl">
+            Not just another
+            <br />
+            generic coach.
           </h2>
-          <p className="mt-6 text-pretty text-lg leading-relaxed text-muted-foreground">
-            Traditional presentation coaching gives you surface-level advice: speak slower, make eye
-            contact, use fewer slides. Vera is fundamentally different.
+        </ScrollReveal>
+
+        {/* Feature words */}
+        <div className="mt-24 flex flex-col gap-6">
+          {features.map((f, i) => (
+            <ScrollReveal
+              key={f.word}
+              direction={i % 2 === 0 ? "left" : "right"}
+              distance={80}
+            >
+              <div className="group flex items-center gap-6 py-4">
+                <div
+                  className="h-2 w-2 rounded-full transition-transform duration-300 group-hover:scale-[2.5]"
+                  style={{ background: f.accent }}
+                />
+                <span className="text-3xl font-bold text-foreground/80 transition-colors duration-300 group-hover:text-foreground md:text-6xl">
+                  {f.word}
+                </span>
+              </div>
+            </ScrollReveal>
+          ))}
+        </div>
+
+        <ScrollReveal className="mt-20" direction="up" distance={30}>
+          <p className="max-w-md text-lg leading-relaxed text-muted-foreground">
+            Feedback that feels like it came from someone in the room.
           </p>
-        </div>
-
-        <div className="mt-16 grid gap-8 md:grid-cols-2">
-          <div className="rounded-2xl border border-border/60 bg-card/60 p-8 backdrop-blur-sm">
-            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-              <span className="text-sm font-bold text-muted-foreground">01</span>
-            </div>
-            <h3 className="text-lg font-semibold text-foreground">Audience-Specific Feedback</h3>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              Vera doesn&apos;t just evaluate your delivery. It evaluates your message from the
-              perspective of the exact people you&apos;ll be presenting to — whether that&apos;s Nike
-              executives, a technical review board, or a VC firm.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-border/60 bg-card/60 p-8 backdrop-blur-sm">
-            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-              <span className="text-sm font-bold text-muted-foreground">02</span>
-            </div>
-            <h3 className="text-lg font-semibold text-foreground">Context-Aware Intelligence</h3>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              Our AI understands industry dynamics, organizational priorities, and stakeholder
-              psychology. The feedback you get feels like it came from someone who was actually in
-              the room.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-border/60 bg-card/60 p-8 backdrop-blur-sm">
-            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-              <span className="text-sm font-bold text-muted-foreground">03</span>
-            </div>
-            <h3 className="text-lg font-semibold text-foreground">Personalized, Not Generic</h3>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              No more &quot;speak more slowly&quot; or &quot;add a summary slide.&quot; Vera tells you which arguments
-              will land, which claims need evidence, and what questions your audience is likely to
-              ask.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-border/60 bg-card/60 p-8 backdrop-blur-sm">
-            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-              <span className="text-sm font-bold text-muted-foreground">04</span>
-            </div>
-            <h3 className="text-lg font-semibold text-foreground">Built for High Stakes</h3>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              Whether you are pitching to investors, presenting a quarterly review, or defending a
-              thesis, Vera helps you prepare for the moments that matter most in your career.
-            </p>
-          </div>
-        </div>
+        </ScrollReveal>
       </div>
     </section>
   )

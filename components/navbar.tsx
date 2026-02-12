@@ -7,9 +7,9 @@ const navLinks = [
   { label: "About", href: "#about" },
   { label: "Presentation", href: "#how-it-works" },
   { label: "Resume", href: "#" },
-  { label: "Premium", href: "#" },
+  { label: "Premium", href: "/premium" },
   { label: "Login", href: "/login" },
-  { label: "Account", href: "#" },
+  { label: "Account", href: "/account" },
 ]
 
 export function Navbar() {
