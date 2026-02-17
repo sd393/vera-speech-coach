@@ -1,6 +1,6 @@
 import React from "react"
 import type { Metadata, Viewport } from 'next'
-import { Libre_Caslon_Text, IBM_Plex_Mono } from 'next/font/google'
+import { Libre_Caslon_Text } from 'next/font/google'
 
 import { AuthProvider } from '@/contexts/auth-context'
 import './globals.css'
@@ -10,13 +10,6 @@ const libreCaslon = Libre_Caslon_Text({
   weight: ['400', '700'],
   style: ['normal', 'italic'],
   variable: '--font-display',
-  display: 'swap',
-})
-
-const plexMono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
-  variable: '--font-mono',
   display: 'swap',
 })
 
@@ -36,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${libreCaslon.variable} ${plexMono.variable}`}>
+    <html lang="en" className={libreCaslon.variable}>
       <body className="font-sans antialiased">
         <AuthProvider>{children}</AuthProvider>
       </body>

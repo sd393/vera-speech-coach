@@ -9,7 +9,7 @@ export function Footer() {
         <div className="mx-auto flex max-w-6xl flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
             <span className="font-display text-lg font-bold text-foreground">Demian</span>
-            <p className="font-mono mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground">
               The AI rehearsal room.
             </p>
           </div>
@@ -20,7 +20,7 @@ export function Footer() {
                 <li key={link}>
                   <a
                     href="#"
-                    className="font-mono text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
+                    className="text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
                   >
                     {link}
                   </a>
