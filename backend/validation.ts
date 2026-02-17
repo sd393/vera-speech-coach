@@ -47,6 +47,12 @@ const chatMessageSchema = z.object({
 export const chatRequestSchema = z.object({
   messages: z.array(chatMessageSchema).min(1).max(200),
   transcript: z.string().max(100_000).optional(),
+  researchContext: z.string().max(20_000).optional(),
+})
+
+export const researchRequestSchema = z.object({
+  transcript: z.string().min(1).max(100_000),
+  audienceDescription: z.string().min(1).max(10_000),
 })
 
 export const transcribeRequestSchema = z.object({

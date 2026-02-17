@@ -18,6 +18,12 @@ export interface Message {
   attachment?: Attachment
 }
 
+export interface ResearchMeta {
+  searchTerms: string[]
+  audienceSummary: string
+  briefing: string
+}
+
 function generateId(): string {
   return Math.random().toString(36).substring(2, 11)
 }
@@ -32,8 +38,11 @@ const INITIAL_MESSAGE: Message = {
 export function useChat(authToken?: string | null) {
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE])
   const [transcript, setTranscript] = useState<string | null>(null)
+  const [researchContext, setResearchContext] = useState<string | null>(null)
+  const [researchMeta, setResearchMeta] = useState<ResearchMeta | null>(null)
   const [isCompressing, setIsCompressing] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
+  const [isResearching, setIsResearching] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [trialMessagesRemaining, setTrialMessagesRemaining] = useState<
@@ -43,11 +52,13 @@ export function useChat(authToken?: string | null) {
   const abortControllerRef = useRef<AbortController | null>(null)
   const messagesRef = useRef<Message[]>([INITIAL_MESSAGE])
   const transcriptRef = useRef<string | null>(null)
+  const researchContextRef = useRef<string | null>(null)
   const authTokenRef = useRef<string | null>(null)
 
   // Keep refs in sync with state on each render
   messagesRef.current = messages
   transcriptRef.current = transcript
+  researchContextRef.current = researchContext
   authTokenRef.current = authToken ?? null
 
   // On mount for trial users, check cookie for prior trial usage
@@ -104,6 +115,7 @@ export function useChat(authToken?: string | null) {
               content: m.content,
             })),
             transcript: currentTranscript ?? undefined,
+            researchContext: researchContextRef.current ?? undefined,
           }),
           signal: controller.signal,
         })
@@ -207,6 +219,71 @@ export function useChat(authToken?: string | null) {
     []
   )
 
+  const runResearchPipeline = useCallback(
+    async (currentTranscript: string, currentMessages: Message[]) => {
+      setIsResearching(true)
+      try {
+        // Extract audience description from user text messages after the upload
+        const uploadIndex = currentMessages.findIndex((m) => m.attachment)
+        const audienceMessages = currentMessages
+          .slice(uploadIndex + 1)
+          .filter((m) => m.role === 'user')
+          .map((m) => m.content)
+
+        if (audienceMessages.length === 0) return null
+
+        const audienceDescription = audienceMessages.join('\n')
+
+        console.log('[research] Starting pipeline...', { audienceDescription })
+
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        }
+        const token = authTokenRef.current
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`
+        }
+
+        const response = await fetch('/api/research', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            transcript: currentTranscript,
+            audienceDescription,
+          }),
+        })
+
+        if (!response.ok) {
+          console.warn('[research] Pipeline failed:', response.status)
+          return null
+        }
+
+        const data = await response.json()
+
+        console.log('[research] Pipeline complete:', {
+          audienceSummary: data.audienceSummary,
+          searchTerms: data.searchTerms,
+          briefingLength: data.researchContext?.length,
+        })
+
+        setResearchContext(data.researchContext)
+        researchContextRef.current = data.researchContext
+        setResearchMeta({
+          searchTerms: data.searchTerms,
+          audienceSummary: data.audienceSummary,
+          briefing: data.researchContext,
+        })
+        return data.researchContext as string
+      } catch {
+        console.warn('[research] Pipeline error, proceeding without enrichment')
+        return null
+      } finally {
+        setIsResearching(false)
+      }
+    },
+    []
+  )
+
   const sendMessage = useCallback(
     async (content: string) => {
       const trimmed = content.trim()
@@ -225,9 +302,26 @@ export function useChat(authToken?: string | null) {
       messagesRef.current = updatedMessages
       setMessages(updatedMessages)
 
+      // Determine if we need to run research before the chat response
+      const hasTranscript = transcriptRef.current !== null
+      const hasResearch = researchContextRef.current !== null
+      const uploadExists = updatedMessages.some((m) => m.attachment)
+      const userTextMessages = updatedMessages.filter(
+        (m) => m.role === 'user' && !m.attachment
+      )
+      // Trigger research when we have a transcript, no research yet, and the
+      // user has sent at least 2 text messages (the first after upload answers
+      // Demian's audience questions)
+      const shouldResearch =
+        hasTranscript && !hasResearch && uploadExists && userTextMessages.length >= 2
+
+      if (shouldResearch) {
+        await runResearchPipeline(transcriptRef.current!, updatedMessages)
+      }
+
       await streamChatResponse(updatedMessages, transcriptRef.current)
     },
-    [streamChatResponse]
+    [streamChatResponse, runResearchPipeline]
   )
 
   const uploadFile = useCallback(
@@ -330,8 +424,12 @@ export function useChat(authToken?: string | null) {
     abortInFlight()
     setMessages([INITIAL_MESSAGE])
     setTranscript(null)
+    setResearchContext(null)
+    setResearchMeta(null)
+    researchContextRef.current = null
     setIsCompressing(false)
     setIsTranscribing(false)
+    setIsResearching(false)
     setIsStreaming(false)
     setError(null)
   }, [])
@@ -339,8 +437,11 @@ export function useChat(authToken?: string | null) {
   return {
     messages,
     transcript,
+    researchContext,
+    researchMeta,
     isCompressing,
     isTranscribing,
+    isResearching,
     isStreaming,
     error,
     trialMessagesRemaining,
