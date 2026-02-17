@@ -20,10 +20,26 @@ The user has not yet uploaded a presentation recording. Your job:
 3. While waiting for the upload, you can ask preliminary questions about their audience, context, and goals.
 4. If they describe their presentation in text instead, acknowledge it and work with that, but encourage uploading a recording for the most accurate feedback.`
 
-function buildPhase2WithTranscript(transcript: string): string {
+function buildPhase2WithTranscript(
+  transcript: string,
+  researchContext?: string
+): string {
+  const researchSection = researchContext
+    ? `
+AUDIENCE RESEARCH BRIEFING:
+The following briefing was compiled from live web research about this specific audience.
+Use these facts, trends, and context to ground your feedback in real knowledge.
+Reference specific points from this briefing when they are relevant to your feedback.
+---
+${researchContext}
+---
+
+`
+    : ''
+
   return `CURRENT PHASE: Audience Discovery & Persona Feedback
 The user has uploaded a presentation and you have the transcript below.
-
+${researchSection}
 Your job depends on what has been discussed so far in the conversation:
 
 IF the conversation does not yet contain clear audience information:
@@ -53,9 +69,12 @@ ${transcript}
 """`
 }
 
-export function buildSystemPrompt(transcript?: string): string {
+export function buildSystemPrompt(
+  transcript?: string,
+  researchContext?: string
+): string {
   const phaseInstructions = transcript
-    ? buildPhase2WithTranscript(transcript)
+    ? buildPhase2WithTranscript(transcript, researchContext)
     : PHASE_1_NO_TRANSCRIPT
 
   return [BASE_IDENTITY, phaseInstructions, RULES].join('\n\n')

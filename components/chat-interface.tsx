@@ -12,10 +12,12 @@ import {
   FileText,
   Mic,
   ArrowRight,
+  Search,
+  ChevronDown,
 } from "lucide-react"
 import { AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
-import { useChat } from "@/hooks/use-chat"
+import { useChat, type ResearchMeta } from "@/hooks/use-chat"
 import { FadeIn, motion } from "@/components/motion"
 import {
   Dialog,
@@ -101,6 +103,61 @@ const FOLLOW_UPS_LATER = [
   },
 ]
 
+function ResearchCard({ meta }: { meta: ResearchMeta }) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div className="rounded-lg border border-border/60 bg-muted/30">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm"
+      >
+        <Search className="h-3.5 w-3.5 text-primary/60" />
+        <span className="font-medium text-foreground/80">
+          Audience research completed
+        </span>
+        <span className="text-muted-foreground">
+          — {meta.searchTerms.length} searches
+        </span>
+        <ChevronDown
+          className={`ml-auto h-3.5 w-3.5 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+      {isOpen && (
+        <div className="border-t border-border/60 px-4 py-3 text-sm">
+          <p className="mb-2 font-medium text-foreground/70">
+            {meta.audienceSummary}
+          </p>
+          <div className="mb-3">
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Search terms
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {meta.searchTerms.map((term) => (
+                <span
+                  key={term}
+                  className="rounded-md bg-background px-2 py-0.5 text-xs text-foreground/70 border border-border/40"
+                >
+                  {term}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Briefing
+            </p>
+            <div className="prose prose-sm max-w-none text-xs leading-relaxed text-foreground/70 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+              <ReactMarkdown>{meta.briefing}</ReactMarkdown>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 interface ChatInterfaceProps {
   authToken?: string | null
   isTrialMode?: boolean
@@ -114,8 +171,10 @@ export function ChatInterface({
 }: ChatInterfaceProps) {
   const {
     messages,
+    researchMeta,
     isCompressing,
     isTranscribing,
+    isResearching,
     isStreaming,
     error,
     trialMessagesRemaining,
@@ -156,7 +215,7 @@ export function ChatInterface({
     return () => clearInterval(interval)
   }, [])
 
-  const isBusy = isCompressing || isTranscribing || isStreaming
+  const isBusy = isCompressing || isTranscribing || isResearching || isStreaming
   const isInputDisabled = isBusy || trialLimitReached
   const isEmptyState =
     messages.length === 1 && messages[0].role === "assistant"
@@ -498,6 +557,21 @@ export function ChatInterface({
                       Transcribing your recording
                     </span>
                   </div>
+                )}
+
+                {/* Research indicator */}
+                {isResearching && (
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="text-sm text-muted-foreground">
+                      Researching your audience
+                    </span>
+                  </div>
+                )}
+
+                {/* Research card — shown after research completes */}
+                {researchMeta && !isResearching && (
+                  <ResearchCard meta={researchMeta} />
                 )}
 
                 {/* Streaming indicator */}
