@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { upload } from '@vercel/blob/client'
 import { validateFile } from '@/backend/validation'
 import { shouldExtractClientSide, extractAudioClientSide } from '@/lib/client-audio'
@@ -29,20 +29,39 @@ const INITIAL_MESSAGE: Message = {
     'Welcome to Vera. I\'m your AI presentation coach. Tell me about the presentation you\'re preparing for — who\'s your audience, what\'s the context, and what are you hoping to achieve? Or upload a video/audio recording (max **500MB**) and I\'ll analyze it for you.',
 }
 
-export function useChat() {
+export function useChat(authToken?: string | null) {
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE])
   const [transcript, setTranscript] = useState<string | null>(null)
   const [isCompressing, setIsCompressing] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [trialMessagesRemaining, setTrialMessagesRemaining] = useState<
+    number | null
+  >(null)
+  const [trialLimitReached, setTrialLimitReached] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const messagesRef = useRef<Message[]>([INITIAL_MESSAGE])
   const transcriptRef = useRef<string | null>(null)
+  const authTokenRef = useRef<string | null>(null)
 
   // Keep refs in sync with state on each render
   messagesRef.current = messages
   transcriptRef.current = transcript
+  authTokenRef.current = authToken ?? null
+
+  // On mount for trial users, check cookie for prior trial usage
+  useEffect(() => {
+    if (authToken) return
+    const match = document.cookie.match(/vera_trial_remaining=(\d+)/)
+    if (match) {
+      const remaining = parseInt(match[1], 10)
+      setTrialMessagesRemaining(remaining)
+      if (remaining <= 0) {
+        setTrialLimitReached(true)
+      }
+    }
+  }, [authToken])
 
   function abortInFlight() {
     if (abortControllerRef.current) {
@@ -68,9 +87,17 @@ export function useChat() {
       abortControllerRef.current = controller
 
       try {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        }
+        const token = authTokenRef.current
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`
+        }
+
         const response = await fetch('/api/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             messages: currentMessages.map((m) => ({
               role: m.role,
@@ -83,6 +110,14 @@ export function useChat() {
 
         if (!response.ok) {
           const err = await response.json().catch(() => ({}))
+          if (err.code === 'trial_limit_reached') {
+            setTrialLimitReached(true)
+            setMessages((prev) =>
+              prev.filter((m) => m.id !== assistantMessageId)
+            )
+            setIsStreaming(false)
+            return
+          }
           throw new Error(
             err.error || `Request failed with status ${response.status}`
           )
@@ -122,7 +157,14 @@ export function useChat() {
 
             try {
               const parsed = JSON.parse(data)
-              if (parsed.content) {
+              if (parsed.trial_remaining !== undefined) {
+                const remaining = parsed.trial_remaining as number
+                setTrialMessagesRemaining(remaining)
+                if (remaining <= 0) {
+                  setTrialLimitReached(true)
+                }
+                document.cookie = `vera_trial_remaining=${remaining};path=/;max-age=2592000;SameSite=Lax`
+              } else if (parsed.content) {
                 accumulated += parsed.content
                 // Batch state updates with rAF
                 if (rafId === null) {
@@ -301,6 +343,8 @@ export function useChat() {
     isTranscribing,
     isStreaming,
     error,
+    trialMessagesRemaining,
+    trialLimitReached,
     sendMessage,
     uploadFile,
     clearError,

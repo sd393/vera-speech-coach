@@ -1,22 +1,23 @@
 "use client"
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { ChatNavbar } from "@/components/chat-navbar"
 import { ChatInterface } from "@/components/chat-interface"
 
 export default function ChatPage() {
   const { user, loading } = useAuth()
-  const router = useRouter()
+  const [idToken, setIdToken] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.replace("/login")
+    if (user) {
+      user.getIdToken().then(setIdToken)
+    } else {
+      setIdToken(null)
     }
-  }, [loading, user, router])
+  }, [user])
 
-  if (loading) {
+  if (loading || (user && !idToken)) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -24,12 +25,15 @@ export default function ChatPage() {
     )
   }
 
-  if (!user) return null
+  const isTrialMode = !user
 
   return (
     <div className="flex h-screen flex-col">
-      <ChatNavbar />
-      <ChatInterface />
+      <ChatNavbar isTrialMode={isTrialMode} />
+      <ChatInterface
+        authToken={isTrialMode ? null : idToken}
+        isTrialMode={isTrialMode}
+      />
     </div>
   )
 }

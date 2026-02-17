@@ -72,7 +72,7 @@ export function Hero() {
           <FadeIn delay={0.35}>
             <div className="mt-10 flex gap-4">
               <a
-                href="/login"
+                href="/chat"
                 className="inline-flex items-center rounded-lg bg-primary px-8 py-3.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-300 hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/25 hover:scale-[1.02] active:scale-[0.98]"
               >
                 Get Started Free

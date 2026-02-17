@@ -3,7 +3,11 @@
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 
-export function ChatNavbar() {
+interface ChatNavbarProps {
+  isTrialMode?: boolean
+}
+
+export function ChatNavbar({ isTrialMode }: ChatNavbarProps) {
   const router = useRouter()
   const { user, signOut } = useAuth()
 
@@ -19,18 +23,37 @@ export function ChatNavbar() {
           Vera
         </a>
         <div className="flex items-center gap-4">
-          {user?.displayName && (
-            <span className="text-sm text-muted-foreground">
-              {user.displayName}
-            </span>
+          {isTrialMode ? (
+            <>
+              <a
+                href="/login"
+                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Log in
+              </a>
+              <a
+                href="/login"
+                className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                Sign up
+              </a>
+            </>
+          ) : (
+            <>
+              {user?.displayName && (
+                <span className="text-sm text-muted-foreground">
+                  {user.displayName}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Logout
+              </button>
+            </>
           )}
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Logout
-          </button>
         </div>
       </div>
     </nav>

@@ -18,6 +18,14 @@ import { AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
 import { useChat } from "@/hooks/use-chat"
 import { FadeIn, motion } from "@/components/motion"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -81,23 +89,34 @@ const FOLLOW_UPS_LATER = [
   },
 ]
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  authToken?: string | null
+  isTrialMode?: boolean
+}
+
+export function ChatInterface({
+  authToken,
+  isTrialMode,
+}: ChatInterfaceProps) {
   const {
     messages,
     isCompressing,
     isTranscribing,
     isStreaming,
     error,
+    trialMessagesRemaining,
+    trialLimitReached,
     sendMessage,
     uploadFile,
     clearError,
-  } = useChat()
+  } = useChat(authToken)
 
   const [input, setInput] = useState("")
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const isBusy = isCompressing || isTranscribing || isStreaming
+  const isInputDisabled = isBusy || trialLimitReached
   const isEmptyState =
     messages.length === 1 && messages[0].role === "assistant"
 
@@ -128,7 +147,7 @@ export function ChatInterface() {
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const trimmed = input.trim()
-    if (!trimmed || isBusy) return
+    if (!trimmed || isInputDisabled) return
 
     setInput("")
     sendMessage(trimmed)
@@ -200,6 +219,11 @@ export function ChatInterface() {
                   Describe your audience and Vera will simulate them, giving you
                   feedback that actually matters.
                 </p>
+                {isTrialMode && (
+                  <p className="mt-2 text-sm text-primary/70">
+                    Try 4 free messages — no account needed
+                  </p>
+                )}
               </FadeIn>
 
               <FadeIn delay={0.25}>
@@ -212,7 +236,7 @@ export function ChatInterface() {
                         setInput("")
                         sendMessage(s.message)
                       }}
-                      disabled={isBusy}
+                      disabled={isInputDisabled}
                       className="group flex items-center gap-2.5 rounded-xl border border-border bg-white px-5 py-3 text-sm font-medium text-foreground shadow-sm transition-all duration-150 hover:border-primary/30 hover:shadow-md active:scale-[0.98] disabled:opacity-50"
                     >
                       <s.icon className="h-4 w-4 text-primary/70 transition-colors group-hover:text-primary" />
@@ -227,7 +251,7 @@ export function ChatInterface() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={isBusy}
+                    disabled={isInputDisabled}
                     className="group flex items-center gap-3 rounded-xl border-2 border-dashed border-border bg-white px-8 py-4 text-sm font-medium text-muted-foreground transition-all duration-150 hover:border-primary/30 hover:text-foreground disabled:opacity-50"
                   >
                     <Upload className="h-5 w-5 text-primary/50 transition-colors group-hover:text-primary/70" />
@@ -258,6 +282,17 @@ export function ChatInterface() {
                   </span>
                 </div>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  {isTrialMode &&
+                    trialMessagesRemaining !== null &&
+                    trialMessagesRemaining > 0 && (
+                      <span className="font-medium text-primary/70">
+                        {trialMessagesRemaining} free{" "}
+                        {trialMessagesRemaining === 1
+                          ? "message"
+                          : "messages"}{" "}
+                        left
+                      </span>
+                    )}
                   {hasUpload && (
                     <span className="flex items-center gap-1.5">
                       <FileAudio className="h-3 w-3" />
@@ -384,7 +419,8 @@ export function ChatInterface() {
                             setInput("")
                             sendMessage(f.message)
                           }}
-                          className="group flex items-center gap-2 rounded-lg border border-border bg-white px-3.5 py-2 text-sm text-foreground/80 shadow-sm transition-all duration-150 hover:border-primary/30 hover:text-foreground hover:shadow-md active:scale-[0.98]"
+                          disabled={isInputDisabled}
+                          className="group flex items-center gap-2 rounded-lg border border-border bg-white px-3.5 py-2 text-sm text-foreground/80 shadow-sm transition-all duration-150 hover:border-primary/30 hover:text-foreground hover:shadow-md active:scale-[0.98] disabled:opacity-50"
                         >
                           {f.label}
                           <ArrowRight className="h-3 w-3 text-muted-foreground transition-all duration-150 group-hover:translate-x-0.5 group-hover:text-primary" />
@@ -419,7 +455,7 @@ export function ChatInterface() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isBusy}
+              disabled={isInputDisabled}
               className="absolute left-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
               aria-label="Attach a file"
             >
@@ -437,13 +473,13 @@ export function ChatInterface() {
               }}
               placeholder="Describe your audience or ask for feedback..."
               rows={1}
-              disabled={isBusy}
+              disabled={isInputDisabled}
               className="h-12 w-full resize-none rounded-xl border border-border bg-background pl-12 pr-12 py-3 text-sm text-foreground placeholder:text-muted-foreground/70 transition-colors focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
             />
 
             <button
               type="submit"
-              disabled={!input.trim() || isBusy}
+              disabled={!input.trim() || isInputDisabled}
               className="absolute right-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
               aria-label="Send message"
             >
@@ -456,6 +492,35 @@ export function ChatInterface() {
           </div>
         </form>
       </div>
+
+      {/* Trial limit reached dialog */}
+      <Dialog open={trialLimitReached} onOpenChange={() => {}}>
+        <DialogContent
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>You&apos;ve used your free messages</DialogTitle>
+            <DialogDescription>
+              Create a free account to keep coaching with Vera.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row">
+            <a
+              href="/login"
+              className="inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              Log in to existing account
+            </a>
+            <a
+              href="/login"
+              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              Sign up free
+            </a>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

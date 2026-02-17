@@ -3,6 +3,10 @@ import { openai } from '@/backend/openai'
 import { chatRequestSchema, sanitizeInput } from '@/backend/validation'
 import { buildSystemPrompt } from '@/backend/system-prompt'
 import { checkRateLimit, getClientIp } from '@/backend/rate-limit'
+import {
+  checkTrialLimit,
+  incrementTrialUsage,
+} from '@/backend/trial-limit'
 
 export async function handleChat(request: NextRequest) {
   const ip = getClientIp(request)
@@ -11,6 +15,21 @@ export async function handleChat(request: NextRequest) {
       JSON.stringify({ error: 'Too many requests. Please wait a moment.' }),
       { status: 429, headers: { 'Content-Type': 'application/json' } }
     )
+  }
+
+  const isTrialUser = !request.headers.get('authorization')
+
+  if (isTrialUser) {
+    const trial = checkTrialLimit(ip)
+    if (!trial.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: 'You\'ve used all your free messages. Sign up to continue.',
+          code: 'trial_limit_reached',
+        }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
   }
 
   try {
@@ -48,6 +67,14 @@ export async function handleChat(request: NextRequest) {
       max_tokens: 2000,
     })
 
+    if (isTrialUser) {
+      incrementTrialUsage(ip)
+    }
+
+    const trialRemaining = isTrialUser
+      ? checkTrialLimit(ip).remaining
+      : undefined
+
     const encoder = new TextEncoder()
     const readable = new ReadableStream({
       async start(controller) {
@@ -60,6 +87,13 @@ export async function handleChat(request: NextRequest) {
               )
             }
           }
+          if (trialRemaining !== undefined) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ trial_remaining: trialRemaining })}\n\n`
+              )
+            )
+          }
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))
           controller.close()
         } catch (err) {
@@ -69,13 +103,17 @@ export async function handleChat(request: NextRequest) {
       },
     })
 
-    return new Response(readable, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-      },
-    })
+    const headers: Record<string, string> = {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    }
+
+    if (trialRemaining !== undefined) {
+      headers['X-Trial-Remaining'] = String(trialRemaining)
+    }
+
+    return new Response(readable, { headers })
   } catch (error) {
     console.error('Chat error:', error)
     return new Response(
