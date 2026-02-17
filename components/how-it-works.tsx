@@ -3,9 +3,9 @@
 import { ScrollReveal, useParallax, motion, useTransform } from "@/components/motion"
 
 const steps = [
-  { number: "01", title: "Describe your audience" },
-  { number: "02", title: "Upload your presentation" },
-  { number: "03", title: "Get real feedback" },
+  { number: "01", title: "Describe" },
+  { number: "02", title: "Present" },
+  { number: "03", title: "Get feedback" },
 ]
 
 export function HowItWorks() {
@@ -61,7 +61,7 @@ export function HowItWorks() {
 
       <div className="mx-auto max-w-5xl">
         <ScrollReveal direction="up" distance={40}>
-          <h2 className="text-3xl font-bold tracking-tight text-white md:text-5xl">
+          <h2 className="font-display text-3xl font-bold tracking-tight text-white md:text-5xl">
             Three steps.
           </h2>
         </ScrollReveal>

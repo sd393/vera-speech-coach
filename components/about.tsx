@@ -31,7 +31,7 @@ export function About() {
 
       <div className="mx-auto max-w-5xl">
         <ScrollReveal direction="up" distance={40}>
-          <h2 className="max-w-lg text-3xl font-bold tracking-tight text-foreground md:text-5xl">
+          <h2 className="font-display max-w-lg text-3xl font-bold tracking-tight text-foreground md:text-5xl">
             Not just another
             <br />
             generic coach.
@@ -68,7 +68,7 @@ export function About() {
                     style={{ background: f.accent, opacity: 0.3 }}
                   />
 
-                  <span className="text-4xl font-bold text-foreground/80 transition-colors duration-300 group-hover:text-foreground md:text-6xl lg:text-8xl">
+                  <span className="font-display text-4xl font-bold text-foreground/80 transition-colors duration-300 group-hover:text-foreground md:text-6xl lg:text-8xl">
                     {f.word}
                   </span>
                 </div>

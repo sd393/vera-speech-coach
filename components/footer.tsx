@@ -8,7 +8,7 @@ export function Footer() {
       <ScrollReveal direction="up" distance={20}>
         <div className="mx-auto flex max-w-6xl flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <span className="text-lg font-bold text-foreground">Demian</span>
+            <span className="font-display text-lg font-bold text-foreground">Demian</span>
             <p className="mt-1 text-sm text-muted-foreground">
               The AI rehearsal room.
             </p>

@@ -113,10 +113,10 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md">
         {/* Brand */}
-        <div className="mb-10 text-center">
+        <div className="mb-6 text-center">
           <a
             href="/"
-            className="text-2xl font-bold tracking-tight text-foreground"
+            className="font-display text-2xl font-bold tracking-tight text-foreground"
           >
             Demian
           </a>

@@ -58,12 +58,12 @@ function StatItem({
       <div className="group">
         {/* Number + suffix */}
         <div className="flex items-baseline">
-          <span className="text-5xl font-bold tracking-tight text-foreground md:text-6xl lg:text-7xl">
+          <span className="font-display text-5xl font-bold tracking-tight text-foreground md:text-6xl lg:text-7xl">
             {inView ? count : 0}
           </span>
           {stat.suffix && (
             <span
-              className="ml-1 text-3xl font-bold md:text-4xl"
+              className="font-display ml-1 text-3xl font-bold md:text-4xl"
               style={{ color: stat.accent }}
             >
               {stat.suffix}

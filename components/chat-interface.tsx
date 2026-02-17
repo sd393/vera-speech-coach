@@ -252,7 +252,7 @@ export function ChatInterface({
                 </p>
               </FadeIn>
               <FadeIn delay={0.1}>
-                <h1 className="text-4xl font-bold tracking-tight text-foreground md:text-5xl">
+                <h1 className="font-display text-4xl font-bold tracking-tight text-foreground md:text-5xl">
                   Rehearse with
                   <span className="mt-1 block text-primary">
                     <span className="relative inline-block pb-3">
