@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 
@@ -19,8 +20,8 @@ export function ChatNavbar({ isTrialMode }: ChatNavbarProps) {
   return (
     <nav className="flex-shrink-0 border-b border-border/50 bg-background/70 backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <a href="/" className="text-xl font-bold tracking-tight text-foreground">
-          Vera
+        <a href="/" className="font-display text-xl font-bold tracking-tight text-foreground">
+          Demian
         </a>
         <div className="flex items-center gap-4">
           {isTrialMode ? (
@@ -40,11 +41,12 @@ export function ChatNavbar({ isTrialMode }: ChatNavbarProps) {
             </>
           ) : (
             <>
-              {user?.displayName && (
-                <span className="text-sm text-muted-foreground">
-                  {user.displayName}
-                </span>
-              )}
+              <Link
+                href="/account"
+                className="text-sm font-medium text-foreground transition-colors hover:text-foreground/80"
+              >
+                Account
+              </Link>
               <button
                 type="button"
                 onClick={handleLogout}

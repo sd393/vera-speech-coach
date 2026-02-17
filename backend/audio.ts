@@ -13,7 +13,7 @@ const MAX_CHUNK_DURATION = 1400 // seconds — gpt-4o-mini-transcribe limit is 1
 
 function tempPath(ext: string): string {
   const id = crypto.randomBytes(8).toString('hex')
-  return path.join(os.tmpdir(), `vera-${id}${ext}`)
+  return path.join(os.tmpdir(), `demian-${id}${ext}`)
 }
 
 /**

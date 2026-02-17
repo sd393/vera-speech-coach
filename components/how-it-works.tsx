@@ -3,22 +3,20 @@
 import { ScrollReveal, useParallax, motion, useTransform } from "@/components/motion"
 
 const steps = [
-  { number: "01", title: "Describe your audience" },
-  { number: "02", title: "Upload your presentation" },
-  { number: "03", title: "Get real feedback" },
+  { number: "01", title: "Describe" },
+  { number: "02", title: "Present" },
+  { number: "03", title: "Get feedback" },
 ]
 
 export function HowItWorks() {
-  const { ref, scrollYProgress, med, slow, neg } = useParallax()
+  const { ref, scrollYProgress } = useParallax()
   const lineWidth = useTransform(scrollYProgress, [0.15, 0.55], ["0%", "100%"])
-  const rotate1 = useTransform(scrollYProgress, [0, 1], [-15, 15])
-  const rotate2 = useTransform(scrollYProgress, [0, 1], [10, -30])
 
   return (
     <section
       ref={ref}
       id="how-it-works"
-      className="relative overflow-hidden px-6 py-24 md:py-32"
+      className="relative overflow-hidden px-6 py-14 md:py-20"
     >
       {/* Dark background */}
       <div
@@ -30,43 +28,14 @@ export function HowItWorks() {
         }}
       />
 
-      {/* Parallax glow */}
-      <motion.div
-        style={{ y: med }}
-        className="pointer-events-none absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full opacity-10 blur-3xl"
-        aria-hidden="true"
-      >
-        <div
-          className="h-full w-full rounded-full"
-          style={{ background: "radial-gradient(circle, hsl(192 80% 55%), transparent 60%)" }}
-        />
-      </motion.div>
-
-      {/* Floating geometric accents */}
-      <motion.div
-        style={{ y: slow, rotate: rotate1 }}
-        className="pointer-events-none absolute left-[8%] top-[25%] -z-10 h-20 w-20 border border-white/[0.04]"
-        aria-hidden="true"
-      />
-      <motion.div
-        style={{ y: neg, rotate: rotate2 }}
-        className="pointer-events-none absolute right-[12%] bottom-[20%] -z-10 h-10 w-10 rounded-full border border-primary/10"
-        aria-hidden="true"
-      />
-      <motion.div
-        style={{ y: med }}
-        className="pointer-events-none absolute right-[25%] top-[15%] -z-10 h-2 w-2 rounded-full bg-primary/20"
-        aria-hidden="true"
-      />
-
       <div className="mx-auto max-w-5xl">
         <ScrollReveal direction="up" distance={40}>
-          <h2 className="text-3xl font-bold tracking-tight text-white md:text-5xl">
+          <h2 className="font-display text-3xl font-bold tracking-tight text-white md:text-5xl">
             Three steps.
           </h2>
         </ScrollReveal>
 
-        <div className="relative mt-16 md:mt-24">
+        <div className="relative mt-10 md:mt-14">
           {/* Animated horizontal progress line */}
           <div className="absolute left-0 right-0 top-0 hidden h-px bg-white/10 md:block">
             <motion.div className="h-full bg-primary/40" style={{ width: lineWidth }} />
@@ -100,14 +69,6 @@ export function HowItWorks() {
           </div>
         </div>
 
-        <ScrollReveal className="mt-16 md:mt-20" direction="up" distance={30}>
-          <a
-            href="/login"
-            className="inline-flex items-center rounded-lg bg-primary px-8 py-3.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-300 hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/25 hover:scale-[1.02] active:scale-[0.98]"
-          >
-            Try it free
-          </a>
-        </ScrollReveal>
       </div>
     </section>
   )

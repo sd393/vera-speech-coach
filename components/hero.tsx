@@ -65,7 +65,7 @@ export function Hero() {
           </FadeIn>
           <FadeIn delay={0.2}>
             <p className="mt-6 max-w-md text-lg leading-relaxed text-muted-foreground">
-              Describe who you&apos;re presenting to. Vera simulates that audience
+              Describe who you&apos;re presenting to. Demian simulates that audience
               and gives you feedback that actually matters.
             </p>
           </FadeIn>
@@ -112,7 +112,7 @@ export function Hero() {
                   evidence. The CFO will push back on that ROI claim.&rdquo;
                 </p>
                 <p className="mt-3 text-xs font-semibold text-primary">
-                  — Vera, simulating your board
+                  — Demian, simulating your board
                 </p>
               </div>
               {/* Bubble tail */}

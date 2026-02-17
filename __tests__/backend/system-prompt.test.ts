@@ -33,10 +33,10 @@ describe('buildSystemPrompt', () => {
     const promptNoTranscript = buildSystemPrompt()
     const promptWithTranscript = buildSystemPrompt('some transcript')
 
-    expect(promptNoTranscript).toContain('Vera')
+    expect(promptNoTranscript).toContain('Demian')
     expect(promptNoTranscript).toContain('presentation coach')
 
-    expect(promptWithTranscript).toContain('Vera')
+    expect(promptWithTranscript).toContain('Demian')
     expect(promptWithTranscript).toContain('presentation coach')
   })
 

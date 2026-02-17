@@ -10,14 +10,12 @@ const features = [
 ]
 
 export function About() {
-  const { ref, scrollYProgress, med, neg, slow, fast } = useParallax()
+  const { ref, scrollYProgress, med } = useParallax()
 
   const lineHeight = useTransform(scrollYProgress, [0.1, 0.65], ["0%", "100%"])
-  const rotate1 = useTransform(scrollYProgress, [0, 1], [0, 90])
-  const rotate2 = useTransform(scrollYProgress, [0, 1], [45, -45])
 
   return (
-    <section id="about" ref={ref} className="relative overflow-hidden px-6 py-24 md:py-32">
+    <section id="about" ref={ref} className="relative overflow-hidden px-6 py-14 md:py-20">
       {/* Parallax glow */}
       <motion.div
         style={{ y: med }}
@@ -30,31 +28,10 @@ export function About() {
         />
       </motion.div>
 
-      {/* Floating geometric accents */}
-      <motion.div
-        style={{ y: slow, rotate: rotate1 }}
-        className="pointer-events-none absolute right-[15%] top-[20%] -z-10 h-16 w-16 border border-primary/10"
-        aria-hidden="true"
-      />
-      <motion.div
-        style={{ y: fast, rotate: rotate2 }}
-        className="pointer-events-none absolute left-[10%] bottom-[25%] -z-10 h-8 w-8 rounded-full border border-primary/15"
-        aria-hidden="true"
-      />
-      <motion.div
-        style={{ y: neg }}
-        className="pointer-events-none absolute right-[8%] bottom-[35%] -z-10 h-3 w-3 rounded-full bg-primary/10"
-        aria-hidden="true"
-      />
-      <motion.div
-        style={{ y: med }}
-        className="pointer-events-none absolute left-[20%] top-[15%] -z-10 h-24 w-px bg-gradient-to-b from-primary/20 to-transparent"
-        aria-hidden="true"
-      />
 
       <div className="mx-auto max-w-5xl">
         <ScrollReveal direction="up" distance={40}>
-          <h2 className="max-w-lg text-3xl font-bold tracking-tight text-foreground md:text-5xl">
+          <h2 className="font-display max-w-lg text-3xl font-bold tracking-tight text-foreground md:text-5xl">
             Not just another
             <br />
             generic coach.
@@ -62,7 +39,7 @@ export function About() {
         </ScrollReveal>
 
         {/* Feature words — dramatic scale, animated accents */}
-        <div className="relative mt-16 md:mt-20">
+        <div className="relative mt-10 md:mt-14">
           {/* Vertical accent line — scroll-animated */}
           <div className="absolute left-0 top-0 bottom-0 hidden w-px bg-border/30 md:block">
             <motion.div
@@ -91,7 +68,7 @@ export function About() {
                     style={{ background: f.accent, opacity: 0.3 }}
                   />
 
-                  <span className="text-4xl font-bold text-foreground/80 transition-colors duration-300 group-hover:text-foreground md:text-6xl lg:text-8xl">
+                  <span className="font-display text-4xl font-bold text-foreground/80 transition-colors duration-300 group-hover:text-foreground md:text-6xl lg:text-8xl">
                     {f.word}
                   </span>
                 </div>
@@ -100,11 +77,6 @@ export function About() {
           </div>
         </div>
 
-        <ScrollReveal className="mt-12" direction="up" distance={30}>
-          <p className="max-w-sm text-lg leading-relaxed text-muted-foreground">
-            Feedback that feels like it came from someone in the room.
-          </p>
-        </ScrollReveal>
       </div>
     </section>
   )

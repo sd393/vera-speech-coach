@@ -26,7 +26,7 @@ const INITIAL_MESSAGE: Message = {
   id: generateId(),
   role: 'assistant',
   content:
-    'Welcome to Vera. I\'m your AI presentation coach. Tell me about the presentation you\'re preparing for — who\'s your audience, what\'s the context, and what are you hoping to achieve? Or upload a video/audio recording (max **500MB**) and I\'ll analyze it for you.',
+    'Welcome to Demian. I\'m your AI presentation coach. Tell me about the presentation you\'re preparing for — who\'s your audience, what\'s the context, and what are you hoping to achieve? Or upload a video/audio recording (max **500MB**) and I\'ll analyze it for you.',
 }
 
 export function useChat(authToken?: string | null) {
@@ -53,7 +53,7 @@ export function useChat(authToken?: string | null) {
   // On mount for trial users, check cookie for prior trial usage
   useEffect(() => {
     if (authToken) return
-    const match = document.cookie.match(/vera_trial_remaining=(\d+)/)
+    const match = document.cookie.match(/demian_trial_remaining=(\d+)/)
     if (match) {
       const remaining = parseInt(match[1], 10)
       setTrialMessagesRemaining(remaining)
@@ -163,7 +163,7 @@ export function useChat(authToken?: string | null) {
                 if (remaining <= 0) {
                   setTrialLimitReached(true)
                 }
-                document.cookie = `vera_trial_remaining=${remaining};path=/;max-age=2592000;SameSite=Lax`
+                document.cookie = `demian_trial_remaining=${remaining};path=/;max-age=2592000;SameSite=Lax`
               } else if (parsed.content) {
                 accumulated += parsed.content
                 // Batch state updates with rAF

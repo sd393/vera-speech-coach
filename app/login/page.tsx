@@ -113,12 +113,12 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md">
         {/* Brand */}
-        <div className="mb-10 text-center">
+        <div className="mb-6 text-center">
           <a
             href="/"
-            className="text-2xl font-bold tracking-tight text-foreground"
+            className="font-display text-2xl font-bold tracking-tight text-foreground"
           >
-            Vera
+            Demian
           </a>
           <p className="mt-2 text-sm text-muted-foreground">
             {isSignUp

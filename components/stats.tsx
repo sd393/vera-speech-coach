@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ScrollReveal, useParallax, motion, useTransform } from "@/components/motion"
+import { ScrollReveal } from "@/components/motion"
 import { useInView } from "@/hooks/use-in-view"
 
 /* ── Count-up hook ── */
@@ -58,12 +58,12 @@ function StatItem({
       <div className="group">
         {/* Number + suffix */}
         <div className="flex items-baseline">
-          <span className="text-5xl font-bold tracking-tight text-foreground md:text-6xl lg:text-7xl">
+          <span className="font-display text-5xl font-bold tracking-tight text-foreground md:text-6xl lg:text-7xl">
             {inView ? count : 0}
           </span>
           {stat.suffix && (
             <span
-              className="ml-1 text-3xl font-bold md:text-4xl"
+              className="font-display ml-1 text-3xl font-bold md:text-4xl"
               style={{ color: stat.accent }}
             >
               {stat.suffix}
@@ -96,43 +96,11 @@ function StatItem({
 
 export function Stats() {
   const { ref: inViewRef, inView } = useInView(0.2)
-  const { ref: parallaxRef, scrollYProgress, med, slow, neg } = useParallax()
-  const rotate1 = useTransform(scrollYProgress, [0, 1], [0, 60])
 
   return (
     <section
-      ref={parallaxRef}
-      className="relative overflow-hidden px-6 py-24 md:py-32"
+      className="relative overflow-hidden px-6 py-14 md:py-20"
     >
-      {/* Parallax glow */}
-      <motion.div
-        style={{ y: med }}
-        className="pointer-events-none absolute -right-32 top-1/2 -z-10 -translate-y-1/2 h-[400px] w-[400px] rounded-full opacity-[0.06] blur-3xl"
-        aria-hidden="true"
-      >
-        <div
-          className="h-full w-full rounded-full"
-          style={{ background: "radial-gradient(circle, hsl(192 80% 55%), transparent 70%)" }}
-        />
-      </motion.div>
-
-      {/* Floating geometric accents */}
-      <motion.div
-        style={{ y: slow, rotate: rotate1 }}
-        className="pointer-events-none absolute left-[12%] top-[20%] -z-10 h-12 w-12 border border-primary/[0.08]"
-        aria-hidden="true"
-      />
-      <motion.div
-        style={{ y: neg }}
-        className="pointer-events-none absolute right-[10%] top-[30%] -z-10 h-3 w-3 rounded-full bg-primary/10"
-        aria-hidden="true"
-      />
-      <motion.div
-        style={{ y: med }}
-        className="pointer-events-none absolute right-[20%] bottom-[25%] -z-10 h-20 w-px bg-gradient-to-b from-transparent via-primary/15 to-transparent"
-        aria-hidden="true"
-      />
-
       <div
         ref={inViewRef}
         className="mx-auto grid max-w-5xl grid-cols-2 gap-x-8 gap-y-12 md:grid-cols-4 md:gap-x-12"

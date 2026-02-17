@@ -72,9 +72,9 @@ export default function PremiumPage() {
         <div className="mb-16 text-center">
           <a
             href="/"
-            className="text-2xl font-bold tracking-tight text-foreground"
+            className="font-display text-2xl font-bold tracking-tight text-foreground"
           >
-            Vera
+            Demian
           </a>
           <h1 className="mt-6 text-4xl font-bold tracking-tight text-foreground md:text-5xl">
             Choose your plan

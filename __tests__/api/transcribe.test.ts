@@ -13,10 +13,10 @@ vi.mock('@/backend/openai', () => ({
 }))
 
 vi.mock('@/backend/audio', () => ({
-  downloadToTmp: vi.fn().mockResolvedValue('/tmp/vera-test-input.mp4'),
+  downloadToTmp: vi.fn().mockResolvedValue('/tmp/demian-test-input.mp4'),
   processFileForWhisper: vi.fn().mockResolvedValue({
-    chunkPaths: ['/tmp/vera-test-chunk0.mp3'],
-    allTempPaths: ['/tmp/vera-test-input.mp4', '/tmp/vera-test-compressed.mp3', '/tmp/vera-test-chunk0.mp3'],
+    chunkPaths: ['/tmp/demian-test-chunk0.mp3'],
+    allTempPaths: ['/tmp/demian-test-input.mp4', '/tmp/demian-test-compressed.mp3', '/tmp/demian-test-chunk0.mp3'],
   }),
   cleanupTempFiles: vi.fn().mockResolvedValue(undefined),
 }))
@@ -56,10 +56,10 @@ describe('POST /api/transcribe', () => {
     vi.clearAllMocks()
     vi.mocked(checkRateLimit).mockReturnValue({ allowed: true })
     mockTranscriptionCreate.mockResolvedValue({ text: 'This is the transcribed text.' })
-    vi.mocked(downloadToTmp).mockResolvedValue('/tmp/vera-test-input.mp4')
+    vi.mocked(downloadToTmp).mockResolvedValue('/tmp/demian-test-input.mp4')
     vi.mocked(processFileForWhisper).mockResolvedValue({
-      chunkPaths: ['/tmp/vera-test-chunk0.mp3'],
-      allTempPaths: ['/tmp/vera-test-input.mp4', '/tmp/vera-test-compressed.mp3'],
+      chunkPaths: ['/tmp/demian-test-chunk0.mp3'],
+      allTempPaths: ['/tmp/demian-test-input.mp4', '/tmp/demian-test-compressed.mp3'],
     })
   })
 
