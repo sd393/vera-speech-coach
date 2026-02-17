@@ -9,8 +9,7 @@ import {
   FileAudio,
   Loader2,
   Upload,
-  Target,
-  MessageSquare,
+  FileText,
   Mic,
   ArrowRight,
 } from "lucide-react"
@@ -35,24 +34,37 @@ function formatFileSize(bytes: number): string {
 
 /* ── Empty-state starter prompts ── */
 
+const AUDIENCES = [
+  "investors",
+  "your class",
+  "customers",
+  "your team",
+  "a jury",
+  "prospects",
+  "colleagues",
+  "reviewers",
+  "patients",
+  "delegates",
+]
+
 const SUGGESTIONS = [
   {
-    icon: Target,
-    label: "Prep for a board presentation",
-    message:
-      "I'm preparing for a board presentation next week. Can you help me rehearse?",
-  },
-  {
-    icon: MessageSquare,
-    label: "Get feedback on my pitch",
-    message:
-      "I have a startup pitch deck I'd like feedback on. Where should I start?",
+    icon: FileText,
+    label: "Review my slide deck",
+    message: "I have a slide deck I'd like you to review. Where should I start?",
+    action: "send" as const,
   },
   {
     icon: Mic,
-    label: "Analyze my recorded talk",
-    message:
-      "I have a recording of a practice talk I'd like you to analyze.",
+    label: "Listen to my live presentation",
+    message: "I want you to listen to a live presentation I'm working on.",
+    action: "send" as const,
+  },
+  {
+    icon: Upload,
+    label: "Upload a video or audio recording",
+    message: "",
+    action: "upload" as const,
   },
 ]
 
@@ -92,11 +104,13 @@ const FOLLOW_UPS_LATER = [
 interface ChatInterfaceProps {
   authToken?: string | null
   isTrialMode?: boolean
+  onChatStart?: () => void
 }
 
 export function ChatInterface({
   authToken,
   isTrialMode,
+  onChatStart,
 }: ChatInterfaceProps) {
   const {
     messages,
@@ -116,10 +130,31 @@ export function ChatInterface({
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [audienceIndex, setAudienceIndex] = useState(0)
+  const [audienceWidth, setAudienceWidth] = useState(0)
+  const audienceRefCallback = React.useCallback((node: HTMLSpanElement | null) => {
+    if (node) {
+      setAudienceWidth(node.offsetWidth)
+    }
+  }, [])
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAudienceIndex((prev) => (prev + 1) % AUDIENCES.length)
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [])
+
   const isBusy = isCompressing || isTranscribing || isStreaming
   const isInputDisabled = isBusy || trialLimitReached
   const isEmptyState =
     messages.length === 1 && messages[0].role === "assistant"
+
+  useEffect(() => {
+    if (!isEmptyState) {
+      onChatStart?.()
+    }
+  }, [isEmptyState, onChatStart])
 
   // Derived session state
   const exchangeCount = messages.filter((m) => m.role === "user").length
@@ -212,19 +247,49 @@ export function ChatInterface({
 
             <div className="flex flex-col items-center text-center">
               <FadeIn delay={0}>
-                <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-primary/70">
-                  Presentation Coaching
+                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-primary/70">
+                  Demian
                 </p>
               </FadeIn>
               <FadeIn delay={0.1}>
                 <h1 className="text-4xl font-bold tracking-tight text-foreground md:text-5xl">
-                  Ready to rehearse?
+                  Rehearse with
+                  <span className="mt-1 block text-primary">
+                    <span className="relative inline-block pb-3">
+                      <AnimatePresence mode="wait">
+                        <motion.span
+                          ref={audienceRefCallback}
+                          key={AUDIENCES[audienceIndex]}
+                          className="relative z-10 inline-block"
+                          style={{
+                            textShadow: [
+                              "-4px 0", "4px 0", "0 4px", "0 -4px",
+                              "-3px 3px", "3px 3px", "-3px -3px", "3px -3px",
+                              "-2px 4px", "2px 4px", "-4px 2px", "4px 2px",
+                              "-2px -4px", "2px -4px", "-4px -2px", "4px -2px",
+                            ].map((o) => `${o} 0 hsl(var(--background))`).join(", "),
+                          }}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ duration: 0.25, ease: "easeInOut" }}
+                        >
+                          {AUDIENCES[audienceIndex]}
+                        </motion.span>
+                      </AnimatePresence>
+                      <motion.span
+                        className="absolute bottom-[0.18em] left-1/2 h-[3px] -translate-x-1/2 rounded-full bg-primary/30"
+                        animate={{ width: audienceWidth + 20 }}
+                        transition={{ duration: 0.35, ease: "easeInOut" }}
+                      />
+                    </span>
+                  </span>
                 </h1>
               </FadeIn>
               <FadeIn delay={0.15}>
                 <p className="mt-4 max-w-md text-lg leading-relaxed text-muted-foreground">
                   Describe your audience and Demian will simulate them, giving you
-                  feedback that actually matters.
+                  feedback that feels human.
                 </p>
                 {isTrialMode && (
                   <p className="mt-2 text-sm text-primary/70">
@@ -234,37 +299,72 @@ export function ChatInterface({
               </FadeIn>
 
               <FadeIn delay={0.25}>
-                <div className="mt-10 flex flex-wrap justify-center gap-3">
-                  {SUGGESTIONS.map((s) => (
+                <form
+                  onSubmit={handleSubmit}
+                  className="mt-10 w-full max-w-3xl"
+                >
+                  <div className="relative flex items-center">
                     <button
-                      key={s.label}
                       type="button"
-                      onClick={() => {
-                        setInput("")
-                        sendMessage(s.message)
-                      }}
+                      onClick={() => fileInputRef.current?.click()}
                       disabled={isInputDisabled}
-                      className="group flex items-center gap-2.5 rounded-xl border border-border bg-white px-5 py-3 text-sm font-medium text-foreground shadow-sm transition-all duration-150 hover:border-primary/30 hover:shadow-md active:scale-[0.98] disabled:opacity-50"
+                      className="absolute left-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                      aria-label="Attach a file"
                     >
-                      <s.icon className="h-4 w-4 text-primary/70 transition-colors group-hover:text-primary" />
-                      {s.label}
+                      <Paperclip className="h-4 w-4" />
                     </button>
-                  ))}
-                </div>
-              </FadeIn>
 
-              <FadeIn delay={0.35}>
-                <div className="mt-8">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isInputDisabled}
-                    className="group flex items-center gap-3 rounded-xl border-2 border-dashed border-border bg-white px-8 py-4 text-sm font-medium text-muted-foreground transition-all duration-150 hover:border-primary/30 hover:text-foreground disabled:opacity-50"
-                  >
-                    <Upload className="h-5 w-5 text-primary/50 transition-colors group-hover:text-primary/70" />
-                    Upload a video or audio recording
-                  </button>
-                </div>
+                    <textarea
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault()
+                          handleSubmit(e)
+                        }
+                      }}
+                      placeholder="Describe your audience or ask for feedback..."
+                      rows={1}
+                      disabled={isInputDisabled}
+                      className="h-14 w-full resize-none rounded-2xl border-2 border-border bg-white pl-12 pr-14 py-3.5 text-base text-foreground placeholder:text-muted-foreground/50 transition-colors focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                    />
+
+                    <button
+                      type="submit"
+                      disabled={!input.trim() || isInputDisabled}
+                      className="absolute right-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
+                      aria-label="Send message"
+                    >
+                      {isBusy ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="mt-3 flex flex-nowrap justify-center gap-2">
+                    {SUGGESTIONS.map((s) => (
+                      <button
+                        key={s.label}
+                        type="button"
+                        onClick={() => {
+                          if (s.action === "upload") {
+                            fileInputRef.current?.click()
+                          } else {
+                            setInput("")
+                            sendMessage(s.message)
+                          }
+                        }}
+                        disabled={isInputDisabled}
+                        className="group flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-all duration-150 hover:border-primary/30 hover:text-foreground active:scale-[0.98] disabled:opacity-50"
+                      >
+                        <s.icon className="h-3 w-3 text-muted-foreground/60 transition-colors group-hover:text-primary" />
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </form>
               </FadeIn>
             </div>
           </motion.div>
@@ -280,7 +380,7 @@ export function ChatInterface({
             className="flex flex-1 flex-col overflow-hidden"
           >
             {/* Session context bar */}
-            <div className="flex-shrink-0 border-b border-border/60 bg-white px-6 py-3">
+            <div className="flex-shrink-0 border-b border-border/60 px-6 py-3">
               <div className="mx-auto flex max-w-2xl items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="h-1.5 w-1.5 rounded-full bg-primary" />
@@ -327,9 +427,9 @@ export function ChatInterface({
                   return (
                     <div key={msg.id}>
                       {msg.role === "assistant" ? (
-                        /* ── Coaching card ── */
-                        <div className="rounded-2xl border border-border/60 border-l-2 border-l-primary/25 bg-white px-6 py-5 shadow-sm">
-                          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-primary/60">
+                        /* ── Assistant message ── */
+                        <div>
+                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary/60">
                             Demian
                           </p>
                           <div className="prose prose-sm max-w-none text-[0.9375rem] leading-[1.7] text-foreground/90 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:tracking-tight [&_h2]:text-base [&_h2]:font-semibold [&_h2]:tracking-tight [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:uppercase [&_h3]:tracking-wide [&_h3]:text-foreground/70 [&_strong]:text-foreground [&_blockquote]:border-primary/20 [&_blockquote]:text-foreground/70 [&_li]:marker:text-primary/40">
@@ -371,25 +471,21 @@ export function ChatInterface({
 
                 {/* Compressing indicator */}
                 {isCompressing && (
-                  <div className="rounded-2xl border border-border/60 bg-white px-6 py-4 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                      <span className="text-sm text-muted-foreground">
-                        Compressing audio
-                      </span>
-                    </div>
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="text-sm text-muted-foreground">
+                      Compressing audio
+                    </span>
                   </div>
                 )}
 
                 {/* Transcription indicator */}
                 {isTranscribing && !isCompressing && (
-                  <div className="rounded-2xl border border-border/60 bg-white px-6 py-4 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                      <span className="text-sm text-muted-foreground">
-                        Transcribing your recording
-                      </span>
-                    </div>
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="text-sm text-muted-foreground">
+                      Transcribing your recording
+                    </span>
                   </div>
                 )}
 
@@ -398,8 +494,8 @@ export function ChatInterface({
                   messages.length > 0 &&
                   messages[messages.length - 1].role === "assistant" &&
                   messages[messages.length - 1].content === "" && (
-                    <div className="rounded-2xl border border-border/60 border-l-2 border-l-primary/25 bg-white px-6 py-5 shadow-sm">
-                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-primary/60">
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary/60">
                         Demian
                       </p>
                       <div className="flex items-center gap-3">
@@ -452,8 +548,8 @@ export function ChatInterface({
         aria-label="Upload video or audio file"
       />
 
-      {/* Input bar */}
-      <div className="flex-shrink-0 border-t border-border/60 bg-white px-6 py-4">
+      {/* Input bar — hidden during empty state since it's inline above */}
+      {!isEmptyState && <div className="flex-shrink-0 px-6 pb-4 pt-2">
         <form
           onSubmit={handleSubmit}
           className="mx-auto flex max-w-2xl items-center"
@@ -481,7 +577,7 @@ export function ChatInterface({
               placeholder="Describe your audience or ask for feedback..."
               rows={1}
               disabled={isInputDisabled}
-              className="h-12 w-full resize-none rounded-xl border border-border bg-background pl-12 pr-12 py-3 text-sm text-foreground placeholder:text-muted-foreground/70 transition-colors focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+              className="h-14 w-full resize-none rounded-2xl border-2 border-border bg-white pl-12 pr-14 py-3.5 text-base text-foreground placeholder:text-muted-foreground/50 transition-colors focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
             />
 
             <button
@@ -498,7 +594,7 @@ export function ChatInterface({
             </button>
           </div>
         </form>
-      </div>
+      </div>}
 
       {/* Trial limit reached dialog */}
       <Dialog open={showTrialDialog} onOpenChange={setShowTrialDialog}>
