@@ -9,14 +9,16 @@ const steps = [
 ]
 
 export function HowItWorks() {
-  const { ref, scrollYProgress, med } = useParallax()
-  const lineWidth = useTransform(scrollYProgress, [0.2, 0.7], ["0%", "100%"])
+  const { ref, scrollYProgress, med, slow, neg } = useParallax()
+  const lineWidth = useTransform(scrollYProgress, [0.15, 0.55], ["0%", "100%"])
+  const rotate1 = useTransform(scrollYProgress, [0, 1], [-15, 15])
+  const rotate2 = useTransform(scrollYProgress, [0, 1], [10, -30])
 
   return (
     <section
       ref={ref}
       id="how-it-works"
-      className="relative overflow-hidden px-6 py-32 md:py-44"
+      className="relative overflow-hidden px-6 py-24 md:py-32"
     >
       {/* Dark background */}
       <div
@@ -40,6 +42,23 @@ export function HowItWorks() {
         />
       </motion.div>
 
+      {/* Floating geometric accents */}
+      <motion.div
+        style={{ y: slow, rotate: rotate1 }}
+        className="pointer-events-none absolute left-[8%] top-[25%] -z-10 h-20 w-20 border border-white/[0.04]"
+        aria-hidden="true"
+      />
+      <motion.div
+        style={{ y: neg, rotate: rotate2 }}
+        className="pointer-events-none absolute right-[12%] bottom-[20%] -z-10 h-10 w-10 rounded-full border border-primary/10"
+        aria-hidden="true"
+      />
+      <motion.div
+        style={{ y: med }}
+        className="pointer-events-none absolute right-[25%] top-[15%] -z-10 h-2 w-2 rounded-full bg-primary/20"
+        aria-hidden="true"
+      />
+
       <div className="mx-auto max-w-5xl">
         <ScrollReveal direction="up" distance={40}>
           <h2 className="text-3xl font-bold tracking-tight text-white md:text-5xl">
@@ -47,31 +66,41 @@ export function HowItWorks() {
           </h2>
         </ScrollReveal>
 
-        <div className="relative mt-20">
-          {/* Animated progress line */}
-          <div className="absolute left-0 right-0 top-6 hidden h-px bg-white/10 md:block">
+        <div className="relative mt-16 md:mt-24">
+          {/* Animated horizontal progress line */}
+          <div className="absolute left-0 right-0 top-0 hidden h-px bg-white/10 md:block">
             <motion.div className="h-full bg-primary/40" style={{ width: lineWidth }} />
           </div>
 
           <div className="grid gap-16 md:grid-cols-3 md:gap-0">
-            {steps.map((step) => (
+            {steps.map((step, i) => (
               <ScrollReveal key={step.number} direction="up" distance={50}>
-                <div className="relative md:px-8">
-                  <div className="mb-8 flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/5 backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover:bg-primary/10 hover:scale-110">
-                    <span className="text-sm font-bold text-white/70">
-                      {step.number}
-                    </span>
-                  </div>
-                  <h3 className="text-xl font-semibold text-white">
+                <div className="group relative md:pt-16 md:pr-8">
+                  {/* Dot on the progress line */}
+                  <div className="absolute -top-[4px] left-0 hidden h-[9px] w-[9px] rounded-full bg-primary/50 transition-all duration-300 group-hover:bg-primary group-hover:scale-150 md:block" />
+
+                  {/* Giant decorative number */}
+                  <span
+                    className="block text-[80px] font-bold leading-none tracking-tighter text-white/[0.04] transition-colors duration-500 group-hover:text-white/[0.08] md:text-[120px]"
+                    aria-hidden="true"
+                  >
+                    {step.number}
+                  </span>
+
+                  {/* Title overlaid */}
+                  <h3 className="-mt-8 text-xl font-semibold text-white md:-mt-12 md:text-2xl">
                     {step.title}
                   </h3>
+
+                  {/* Animated accent line — appears on hover */}
+                  <div className="mt-4 h-px w-0 bg-primary/40 transition-all duration-500 group-hover:w-16" />
                 </div>
               </ScrollReveal>
             ))}
           </div>
         </div>
 
-        <ScrollReveal className="mt-20" direction="up" distance={30}>
+        <ScrollReveal className="mt-16 md:mt-20" direction="up" distance={30}>
           <a
             href="/login"
             className="inline-flex items-center rounded-lg bg-primary px-8 py-3.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-300 hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/25 hover:scale-[1.02] active:scale-[0.98]"
