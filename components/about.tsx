@@ -3,10 +3,10 @@
 import { ScrollReveal, useParallax, motion, useTransform } from "@/components/motion"
 
 const features = [
-  { word: "Audience-aware", accent: "hsl(192 80% 55%)" },
-  { word: "Context-driven", accent: "hsl(165 55% 50%)" },
-  { word: "Personalized", accent: "hsl(210 70% 60%)" },
-  { word: "High-stakes ready", accent: "hsl(192 91% 36%)" },
+  { word: "Audience-aware", accent: "hsl(36 56% 48%)" },
+  { word: "Context-driven", accent: "hsl(34 35% 74%)" },
+  { word: "Personalized", accent: "hsl(37 14% 50%)" },
+  { word: "High-stakes ready", accent: "hsl(36 56% 42%)" },
 ]
 
 export function About() {
@@ -24,7 +24,7 @@ export function About() {
       >
         <div
           className="h-full w-full rounded-full"
-          style={{ background: "radial-gradient(circle, hsl(192 80% 55%), transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, hsl(36 56% 48%), transparent 70%)" }}
         />
       </motion.div>
 

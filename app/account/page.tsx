@@ -34,15 +34,20 @@ export default function AccountPage() {
 
   return (
     <div className="relative min-h-screen px-6 py-24">
-      {/* Background gradient */}
+      {/* Subtle warm glow */}
       <div
-        className="pointer-events-none absolute inset-0 -z-10"
+        className="pointer-events-none absolute inset-0 -z-10 bg-background"
         aria-hidden="true"
-        style={{
-          background:
-            "linear-gradient(135deg, hsl(200 40% 95%) 0%, hsl(165 35% 95%) 50%, hsl(190 30% 96%) 100%)",
-        }}
-      />
+      >
+        <div
+          className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full opacity-[0.08] blur-3xl"
+          style={{ background: "radial-gradient(circle, hsl(36 72% 50%), transparent 70%)" }}
+        />
+        <div
+          className="absolute -right-32 bottom-1/4 h-[400px] w-[400px] rounded-full opacity-[0.05] blur-3xl"
+          style={{ background: "radial-gradient(circle, hsl(34 50% 68%), transparent 70%)" }}
+        />
+      </div>
 
       <div className="mx-auto max-w-2xl">
         {/* Header */}
@@ -81,7 +86,7 @@ export default function AccountPage() {
                 <User className="h-3.5 w-3.5 text-muted-foreground" />
                 Name
               </span>
-              <p className="rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground">
+              <p className="rounded-lg border border-border bg-muted px-4 py-2.5 text-sm text-foreground">
                 {user.displayName || "—"}
               </p>
             </div>
@@ -91,7 +96,7 @@ export default function AccountPage() {
                 <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                 Email
               </span>
-              <p className="rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground">
+              <p className="rounded-lg border border-border bg-muted px-4 py-2.5 text-sm text-foreground">
                 {user.email || "—"}
               </p>
             </div>
@@ -124,7 +129,7 @@ export default function AccountPage() {
             <div className="flex flex-col items-center gap-1">
               <button
                 disabled
-                className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Upgrade
               </button>

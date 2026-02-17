@@ -241,7 +241,7 @@ export function ChatInterface({
                   className="h-full w-full rounded-full"
                   style={{
                     background:
-                      "radial-gradient(circle, hsl(192 80% 55%), transparent 70%)",
+                      "radial-gradient(circle, hsl(36 56% 48% / 0.6), transparent 70%)",
                   }}
                 />
               </div>
@@ -250,7 +250,7 @@ export function ChatInterface({
                   className="h-full w-full rounded-full"
                   style={{
                     background:
-                      "radial-gradient(circle, hsl(165 55% 50%), transparent 70%)",
+                      "radial-gradient(circle, hsl(34 35% 74%), transparent 70%)",
                   }}
                 />
               </div>
@@ -258,7 +258,7 @@ export function ChatInterface({
 
             <div className="flex flex-col items-center text-center">
               <FadeIn delay={0}>
-                <p className="font-display mb-2 text-xs font-semibold uppercase tracking-widest text-primary/70">
+                <p className="font-display mb-2 text-xs font-semibold uppercase tracking-widest text-primary">
                   Demian
                 </p>
               </FadeIn>
@@ -303,7 +303,7 @@ export function ChatInterface({
                   feedback that feels human.
                 </p>
                 {isTrialMode && (
-                  <p className="mt-2 text-xs text-primary/70 sm:text-sm">
+                  <p className="mt-2 text-xs text-primary sm:text-sm">
                     Try 4 free messages — no account needed
                   </p>
                 )}
@@ -337,7 +337,7 @@ export function ChatInterface({
                       placeholder={inputPlaceholder}
                       rows={1}
                       disabled={isInputDisabled}
-                      className="h-12 sm:h-14 w-full resize-none rounded-2xl border-2 border-border bg-white pl-14 pr-14 sm:pl-12 sm:pr-14 py-3 sm:py-3.5 text-sm sm:text-base text-foreground placeholder:text-muted-foreground/50 transition-colors focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                      className="h-12 sm:h-14 w-full resize-none rounded-2xl border border-border bg-muted pl-14 pr-14 sm:pl-12 sm:pr-14 py-3 sm:py-3.5 text-sm sm:text-base text-foreground placeholder:text-muted-foreground/60 transition-colors focus:border-primary/30 focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50"
                     />
 
                     <button
@@ -452,7 +452,7 @@ export function ChatInterface({
                         <div className="flex justify-end">
                           <div className="max-w-[80%]">
                             {msg.attachment && (
-                              <div className="mb-2 flex items-center gap-3 rounded-lg border border-border bg-white px-3 py-2">
+                              <div className="mb-2 flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2">
                                 {msg.attachment.type.startsWith("video") ? (
                                   <FileVideo className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                                 ) : (
@@ -534,7 +534,7 @@ export function ChatInterface({
                             sendMessage(f.message)
                           }}
                           disabled={isInputDisabled}
-                          className="group flex items-center gap-2 rounded-lg border border-border bg-white px-3.5 py-2 text-sm text-foreground/80 shadow-sm transition-all duration-150 hover:border-primary/30 hover:text-foreground hover:shadow-md active:scale-[0.98] disabled:opacity-50"
+                          className="group flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-sm text-foreground/80 transition-all duration-150 hover:border-primary/30 hover:bg-accent hover:text-foreground active:scale-[0.98] disabled:opacity-50"
                         >
                           {f.label}
                           <ArrowRight className="h-3 w-3 text-muted-foreground transition-all duration-150 group-hover:translate-x-0.5 group-hover:text-primary" />
@@ -588,7 +588,7 @@ export function ChatInterface({
               placeholder={inputPlaceholder}
               rows={1}
               disabled={isInputDisabled}
-              className="h-12 sm:h-14 w-full resize-none rounded-2xl border-2 border-border bg-white pl-14 pr-14 sm:pl-12 sm:pr-14 py-3 sm:py-3.5 text-sm sm:text-base text-foreground placeholder:text-muted-foreground/50 transition-colors focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+              className="h-12 sm:h-14 w-full resize-none rounded-2xl border border-border bg-muted pl-14 pr-14 sm:pl-12 sm:pr-14 py-3 sm:py-3.5 text-sm sm:text-base text-foreground placeholder:text-muted-foreground/60 transition-colors focus:border-primary/30 focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50"
             />
 
             <button

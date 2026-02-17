@@ -23,7 +23,7 @@ export function Hero() {
         >
           <div
             className="h-full w-full rounded-full"
-            style={{ background: "radial-gradient(circle, hsl(192 80% 55%), transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, hsl(36 56% 48%), transparent 70%)" }}
           />
         </motion.div>
         <motion.div
@@ -32,7 +32,7 @@ export function Hero() {
         >
           <div
             className="h-full w-full rounded-full"
-            style={{ background: "radial-gradient(circle, hsl(165 55% 50%), transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, hsl(34 35% 74%), transparent 70%)" }}
           />
         </motion.div>
         <motion.div
@@ -41,7 +41,7 @@ export function Hero() {
         >
           <div
             className="h-full w-full rounded-full"
-            style={{ background: "radial-gradient(circle, hsl(220 60% 60%), transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, hsl(37 14% 50%), transparent 70%)" }}
           />
         </motion.div>
       </div>
@@ -64,7 +64,7 @@ export function Hero() {
             </h1>
           </FadeIn>
           <FadeIn delay={0.2}>
-            <p className="mt-6 max-w-md text-lg leading-relaxed text-muted-foreground">
+            <p className="mt-6 max-w-md text-lg leading-relaxed text-foreground/60">
               Describe who you&apos;re presenting to. Demian simulates that audience
               and gives you feedback that actually matters.
             </p>
@@ -97,7 +97,7 @@ export function Hero() {
             >
               <div
                 className="h-full w-full rounded-full"
-                style={{ background: "radial-gradient(circle, hsl(192 80% 55%), transparent 70%)" }}
+                style={{ background: "radial-gradient(circle, hsl(36 56% 48%), transparent 70%)" }}
               />
             </motion.div>
 
@@ -106,7 +106,7 @@ export function Hero() {
               className="relative"
             >
               {/* Bubble body */}
-              <div className="rounded-3xl border border-primary/20 bg-white/80 px-8 py-7 shadow-xl shadow-primary/10 backdrop-blur-md transition-shadow duration-300 hover:shadow-2xl hover:shadow-primary/20">
+              <div className="rounded-3xl border border-primary/20 bg-card/90 px-8 py-7 shadow-xl shadow-primary/10 backdrop-blur-md transition-shadow duration-300 hover:shadow-2xl hover:shadow-primary/20">
                 <p className="text-sm font-medium leading-relaxed text-foreground/90">
                   &ldquo;Your opening lands well, but slide 3 needs stronger
                   evidence. The CFO will push back on that ROI claim.&rdquo;
@@ -117,7 +117,7 @@ export function Hero() {
               </div>
               {/* Bubble tail */}
               <div
-                className="absolute -bottom-3 left-10 h-6 w-6 rotate-45 rounded-sm border-b border-r border-primary/20 bg-white/80"
+                className="absolute -bottom-3 left-10 h-6 w-6 rotate-45 rounded-sm border-b border-r border-primary/20 bg-card/90"
               />
             </motion.div>
           </div>

@@ -35,10 +35,10 @@ function useCountUp(end: number, duration: number, inView: boolean, decimals = 0
 /* ── Data ── */
 
 const stats = [
-  { numericValue: 10, suffix: "+", label: "Audience personas", accent: "hsl(192 80% 55%)", barPercent: 65 },
-  { numericValue: 92, suffix: "%", label: "Felt more prepared", accent: "hsl(165 55% 50%)", barPercent: 92 },
-  { numericValue: 500, suffix: "+", label: "Presentations coached", accent: "hsl(210 70% 60%)", barPercent: 80 },
-  { numericValue: 4.8, suffix: "", label: "Average rating", accent: "hsl(192 91% 36%)", barPercent: 96 },
+  { numericValue: 10, suffix: "+", label: "Audience personas", accent: "hsl(36 72% 50%)", barPercent: 65 },
+  { numericValue: 92, suffix: "%", label: "Felt more prepared", accent: "hsl(34 50% 68%)", barPercent: 92 },
+  { numericValue: 500, suffix: "+", label: "Presentations coached", accent: "hsl(30 65% 55%)", barPercent: 80 },
+  { numericValue: 4.8, suffix: "", label: "Average rating", accent: "hsl(42 60% 55%)", barPercent: 96 },
 ]
 
 /* ── Stat item ── */

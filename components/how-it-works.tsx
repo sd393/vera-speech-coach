@@ -24,20 +24,20 @@ export function HowItWorks() {
         aria-hidden="true"
         style={{
           background:
-            "linear-gradient(180deg, hsl(200 25% 8%) 0%, hsl(195 30% 11%) 100%)",
+            "linear-gradient(180deg, hsl(160 5% 7%) 0%, hsl(160 5% 10%) 100%)",
         }}
       />
 
       <div className="mx-auto max-w-5xl">
         <ScrollReveal direction="up" distance={40}>
-          <h2 className="font-display text-3xl font-bold tracking-tight text-white md:text-5xl">
+          <h2 className="font-display text-3xl font-bold tracking-tight text-foreground md:text-5xl">
             Three steps.
           </h2>
         </ScrollReveal>
 
         <div className="relative mt-10 md:mt-14">
           {/* Animated horizontal progress line */}
-          <div className="absolute left-0 right-0 top-0 hidden h-px bg-white/10 md:block">
+          <div className="absolute left-0 right-0 top-0 hidden h-px bg-foreground/10 md:block">
             <motion.div className="h-full bg-primary/40" style={{ width: lineWidth }} />
           </div>
 
@@ -50,14 +50,14 @@ export function HowItWorks() {
 
                   {/* Giant decorative number */}
                   <span
-                    className="block text-[80px] font-bold leading-none tracking-tighter text-white/[0.04] transition-colors duration-500 group-hover:text-white/[0.08] md:text-[120px]"
+                    className="block text-[80px] font-bold leading-none tracking-tighter text-foreground/[0.12] transition-colors duration-500 group-hover:text-foreground/[0.22] md:text-[120px]"
                     aria-hidden="true"
                   >
                     {step.number}
                   </span>
 
                   {/* Title overlaid */}
-                  <h3 className="-mt-8 text-xl font-semibold text-white md:-mt-12 md:text-2xl">
+                  <h3 className="-mt-8 text-xl font-semibold text-foreground md:-mt-12 md:text-2xl">
                     {step.title}
                   </h3>
 
