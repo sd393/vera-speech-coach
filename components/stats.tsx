@@ -35,10 +35,10 @@ function useCountUp(end: number, duration: number, inView: boolean, decimals = 0
 /* ── Data ── */
 
 const stats = [
-  { numericValue: 10, suffix: "+", label: "Audience personas", accent: "hsl(192 80% 55%)", barPercent: 65 },
-  { numericValue: 92, suffix: "%", label: "Felt more prepared", accent: "hsl(165 55% 50%)", barPercent: 92 },
-  { numericValue: 500, suffix: "+", label: "Presentations coached", accent: "hsl(210 70% 60%)", barPercent: 80 },
-  { numericValue: 4.8, suffix: "", label: "Average rating", accent: "hsl(192 91% 36%)", barPercent: 96 },
+  { numericValue: 10, suffix: "+", label: "audience personas", accent: "hsl(192 80% 55%)", barPercent: 65 },
+  { numericValue: 92, suffix: "%", label: "felt more prepared", accent: "hsl(165 55% 50%)", barPercent: 92 },
+  { numericValue: 500, suffix: "+", label: "presentations coached", accent: "hsl(210 70% 60%)", barPercent: 80 },
+  { numericValue: 4.8, suffix: "", label: "average rating", accent: "hsl(192 91% 36%)", barPercent: 96 },
 ]
 
 /* ── Stat item ── */
@@ -72,7 +72,7 @@ function StatItem({
         </div>
 
         {/* Label */}
-        <p className="mt-2 text-sm font-medium text-muted-foreground">
+        <p className="font-mono mt-2 text-sm font-medium text-muted-foreground">
           {stat.label}
         </p>
 
@@ -116,22 +116,6 @@ export function Stats() {
         />
       </motion.div>
 
-      {/* Floating geometric accents */}
-      <motion.div
-        style={{ y: slow, rotate: rotate1 }}
-        className="pointer-events-none absolute left-[12%] top-[20%] -z-10 h-12 w-12 border border-primary/[0.08]"
-        aria-hidden="true"
-      />
-      <motion.div
-        style={{ y: neg }}
-        className="pointer-events-none absolute right-[10%] top-[30%] -z-10 h-3 w-3 rounded-full bg-primary/10"
-        aria-hidden="true"
-      />
-      <motion.div
-        style={{ y: med }}
-        className="pointer-events-none absolute right-[20%] bottom-[25%] -z-10 h-20 w-px bg-gradient-to-b from-transparent via-primary/15 to-transparent"
-        aria-hidden="true"
-      />
 
       <div
         ref={inViewRef}

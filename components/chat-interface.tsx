@@ -247,7 +247,7 @@ export function ChatInterface({
 
             <div className="flex flex-col items-center text-center">
               <FadeIn delay={0}>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-primary/70">
+                <p className="font-mono mb-2 text-xs font-semibold uppercase tracking-widest text-primary/70">
                   Demian
                 </p>
               </FadeIn>
@@ -287,12 +287,12 @@ export function ChatInterface({
                 </h1>
               </FadeIn>
               <FadeIn delay={0.15}>
-                <p className="mt-4 max-w-md text-lg leading-relaxed text-muted-foreground">
+                <p className="font-mono mt-4 max-w-lg text-base leading-relaxed text-muted-foreground">
                   Describe your audience and Demian will simulate them, giving you
                   feedback that feels human.
                 </p>
                 {isTrialMode && (
-                  <p className="mt-2 text-sm text-primary/70">
+                  <p className="font-mono mt-2 text-xs text-primary/70">
                     Try 4 free messages — no account needed
                   </p>
                 )}
@@ -357,7 +357,7 @@ export function ChatInterface({
                           }
                         }}
                         disabled={isInputDisabled}
-                        className="group flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-all duration-150 hover:border-primary/30 hover:text-foreground active:scale-[0.98] disabled:opacity-50"
+                        className="font-mono group flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-all duration-150 hover:border-primary/30 hover:text-foreground active:scale-[0.98] disabled:opacity-50"
                       >
                         <s.icon className="h-3 w-3 text-muted-foreground/60 transition-colors group-hover:text-primary" />
                         {s.label}
@@ -406,7 +406,7 @@ export function ChatInterface({
                       Recording uploaded
                     </span>
                   )}
-                  <span>
+                  <span className="font-mono">
                     {exchangeCount}{" "}
                     {exchangeCount === 1 ? "exchange" : "exchanges"}
                   </span>

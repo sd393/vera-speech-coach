@@ -12,6 +12,7 @@ const config: Config = {
     extend: {
       fontFamily: {
         display: ['var(--font-display)', 'Georgia', 'serif'],
+        mono: ['var(--font-mono)', 'IBM Plex Mono', 'monospace'],
       },
       colors: {
         background: 'hsl(var(--background))',
