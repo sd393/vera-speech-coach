@@ -13,7 +13,14 @@ export function LandingNavbar() {
           Demian
         </Link>
 
-        {!user && (
+        {user ? (
+          <Link
+            href="/account"
+            className="text-sm font-medium text-foreground transition-colors hover:text-foreground/80"
+          >
+            Account
+          </Link>
+        ) : (
           <Link
             href="/login"
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"

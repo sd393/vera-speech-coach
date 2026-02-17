@@ -44,10 +44,10 @@ export default function AccountPage() {
 
       <div className="mx-auto max-w-2xl">
         {/* Header */}
-        <div className="mb-12 text-center">
+        <div className="mb-8 text-center">
           <a
             href="/"
-            className="text-2xl font-bold tracking-tight text-foreground"
+            className="font-display text-2xl font-bold tracking-tight text-foreground"
           >
             Demian
           </a>

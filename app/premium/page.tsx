@@ -72,7 +72,7 @@ export default function PremiumPage() {
         <div className="mb-16 text-center">
           <a
             href="/"
-            className="text-2xl font-bold tracking-tight text-foreground"
+            className="font-display text-2xl font-bold tracking-tight text-foreground"
           >
             Demian
           </a>
