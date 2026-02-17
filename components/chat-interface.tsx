@@ -112,6 +112,7 @@ export function ChatInterface({
   } = useChat(authToken)
 
   const [input, setInput] = useState("")
+  const [showTrialDialog, setShowTrialDialog] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -136,6 +137,12 @@ export function ChatInterface({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages, isTranscribing, isStreaming])
+
+  useEffect(() => {
+    if (trialLimitReached) {
+      setShowTrialDialog(true)
+    }
+  }, [trialLimitReached])
 
   useEffect(() => {
     if (error) {
@@ -494,11 +501,8 @@ export function ChatInterface({
       </div>
 
       {/* Trial limit reached dialog */}
-      <Dialog open={trialLimitReached} onOpenChange={() => {}}>
-        <DialogContent
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => e.preventDefault()}
-        >
+      <Dialog open={showTrialDialog} onOpenChange={setShowTrialDialog}>
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>You&apos;ve used your free messages</DialogTitle>
             <DialogDescription>
