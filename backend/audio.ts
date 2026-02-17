@@ -118,19 +118,31 @@ export async function writeUploadToTmp(file: File): Promise<string> {
 
 /**
  * Download a file from a URL to a temp path on disk.
- * Retries on failure to handle CDN propagation delays after Vercel Blob uploads.
+ * Retries with exponential backoff to handle CDN propagation delays after Vercel Blob uploads.
  */
 export async function downloadToTmp(url: string, fileName: string): Promise<string> {
   const ext = path.extname(fileName) || '.bin'
   const tmpFile = tempPath(ext)
 
-  const MAX_RETRIES = 3
-  const RETRY_DELAY_MS = 2000
+  // Verify blob exists via API (bypasses CDN) before attempting CDN fetch
+  try {
+    const { head } = await import('@vercel/blob')
+    const blobMeta = await head(url)
+    console.log('[downloadToTmp] Blob exists in store:', blobMeta.size, 'bytes, url:', url)
+  } catch (headErr) {
+    console.error('[downloadToTmp] Blob NOT found via head() API:', url, headErr)
+    throw new Error(`Blob does not exist in store: ${url}`)
+  }
+
+  const MAX_RETRIES = 5
+  const INITIAL_DELAY_MS = 1000
 
   let lastStatus = 0
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     if (attempt > 0) {
-      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
+      const delay = INITIAL_DELAY_MS * Math.pow(2, attempt - 1)
+      console.warn(`[downloadToTmp] Retry ${attempt}/${MAX_RETRIES} after ${delay}ms (last status: ${lastStatus})`)
+      await new Promise((r) => setTimeout(r, delay))
     }
     const response = await fetch(url)
     if (response.ok) {
@@ -141,7 +153,7 @@ export async function downloadToTmp(url: string, fileName: string): Promise<stri
     lastStatus = response.status
   }
 
-  throw new Error(`Failed to download file: ${lastStatus}`)
+  throw new Error(`Failed to download file after ${MAX_RETRIES} attempts: ${lastStatus}`)
 }
 
 /**
