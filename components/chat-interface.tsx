@@ -127,8 +127,19 @@ export function ChatInterface({
 
   const [input, setInput] = useState("")
   const [showTrialDialog, setShowTrialDialog] = useState(false)
+  const [inputPlaceholder, setInputPlaceholder] = useState("Describe your audience or ask for feedback...")
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 640px)")
+    const update = () => {
+      setInputPlaceholder(mq.matches ? "Describe your audience or ask for feedback..." : "What's your presentation about?")
+    }
+    update()
+    mq.addEventListener("change", update)
+    return () => mq.removeEventListener("change", update)
+  }, [])
 
   const [audienceIndex, setAudienceIndex] = useState(0)
   const [audienceWidth, setAudienceWidth] = useState(0)
@@ -287,12 +298,12 @@ export function ChatInterface({
                 </h1>
               </FadeIn>
               <FadeIn delay={0.15}>
-                <p className="mt-4 max-w-md text-lg leading-relaxed text-muted-foreground">
+                <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground sm:text-base md:text-lg">
                   Describe your audience and Demian will simulate them, giving you
                   feedback that feels human.
                 </p>
                 {isTrialMode && (
-                  <p className="mt-2 text-sm text-primary/70">
+                  <p className="mt-2 text-xs text-primary/70 sm:text-sm">
                     Try 4 free messages — no account needed
                   </p>
                 )}
@@ -323,10 +334,10 @@ export function ChatInterface({
                           handleSubmit(e)
                         }
                       }}
-                      placeholder="Describe your audience or ask for feedback..."
+                      placeholder={inputPlaceholder}
                       rows={1}
                       disabled={isInputDisabled}
-                      className="h-14 w-full resize-none rounded-2xl border-2 border-border bg-white pl-12 pr-14 py-3.5 text-base text-foreground placeholder:text-muted-foreground/50 transition-colors focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                      className="h-12 sm:h-14 w-full resize-none rounded-2xl border-2 border-border bg-white pl-14 pr-14 sm:pl-12 sm:pr-14 py-3 sm:py-3.5 text-sm sm:text-base text-foreground placeholder:text-muted-foreground/50 transition-colors focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
                     />
 
                     <button
@@ -343,7 +354,7 @@ export function ChatInterface({
                     </button>
                   </div>
 
-                  <div className="mt-3 flex flex-nowrap justify-center gap-2">
+                  <div className="mt-3 flex flex-wrap justify-center gap-2 px-1">
                     {SUGGESTIONS.map((s) => (
                       <button
                         key={s.label}
@@ -357,10 +368,10 @@ export function ChatInterface({
                           }
                         }}
                         disabled={isInputDisabled}
-                        className="group flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-all duration-150 hover:border-primary/30 hover:text-foreground active:scale-[0.98] disabled:opacity-50"
+                        className="group flex items-center gap-1 rounded-full border border-border/60 px-2 py-1 text-[10px] sm:px-3 sm:py-1.5 sm:text-xs text-muted-foreground transition-all duration-150 hover:border-primary/30 hover:text-foreground active:scale-[0.98] disabled:opacity-50"
                       >
-                        <s.icon className="h-3 w-3 text-muted-foreground/60 transition-colors group-hover:text-primary" />
-                        {s.label}
+                        <s.icon className="h-3 w-3 flex-shrink-0 text-muted-foreground/60 transition-colors group-hover:text-primary" />
+                        <span className="whitespace-nowrap">{s.label}</span>
                       </button>
                     ))}
                   </div>
@@ -574,10 +585,10 @@ export function ChatInterface({
                   handleSubmit(e)
                 }
               }}
-              placeholder="Describe your audience or ask for feedback..."
+              placeholder={inputPlaceholder}
               rows={1}
               disabled={isInputDisabled}
-              className="h-14 w-full resize-none rounded-2xl border-2 border-border bg-white pl-12 pr-14 py-3.5 text-base text-foreground placeholder:text-muted-foreground/50 transition-colors focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+              className="h-12 sm:h-14 w-full resize-none rounded-2xl border-2 border-border bg-white pl-14 pr-14 sm:pl-12 sm:pr-14 py-3 sm:py-3.5 text-sm sm:text-base text-foreground placeholder:text-muted-foreground/50 transition-colors focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
             />
 
             <button

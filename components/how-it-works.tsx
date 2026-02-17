@@ -9,10 +9,8 @@ const steps = [
 ]
 
 export function HowItWorks() {
-  const { ref, scrollYProgress, med, slow, neg } = useParallax()
+  const { ref, scrollYProgress } = useParallax()
   const lineWidth = useTransform(scrollYProgress, [0.15, 0.55], ["0%", "100%"])
-  const rotate1 = useTransform(scrollYProgress, [0, 1], [-15, 15])
-  const rotate2 = useTransform(scrollYProgress, [0, 1], [10, -30])
 
   return (
     <section
@@ -28,35 +26,6 @@ export function HowItWorks() {
           background:
             "linear-gradient(180deg, hsl(200 25% 8%) 0%, hsl(195 30% 11%) 100%)",
         }}
-      />
-
-      {/* Parallax glow */}
-      <motion.div
-        style={{ y: med }}
-        className="pointer-events-none absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full opacity-10 blur-3xl"
-        aria-hidden="true"
-      >
-        <div
-          className="h-full w-full rounded-full"
-          style={{ background: "radial-gradient(circle, hsl(192 80% 55%), transparent 60%)" }}
-        />
-      </motion.div>
-
-      {/* Floating geometric accents */}
-      <motion.div
-        style={{ y: slow, rotate: rotate1 }}
-        className="pointer-events-none absolute left-[8%] top-[25%] -z-10 h-20 w-20 border border-white/[0.04]"
-        aria-hidden="true"
-      />
-      <motion.div
-        style={{ y: neg, rotate: rotate2 }}
-        className="pointer-events-none absolute right-[12%] bottom-[20%] -z-10 h-10 w-10 rounded-full border border-primary/10"
-        aria-hidden="true"
-      />
-      <motion.div
-        style={{ y: med }}
-        className="pointer-events-none absolute right-[25%] top-[15%] -z-10 h-2 w-2 rounded-full bg-primary/20"
-        aria-hidden="true"
       />
 
       <div className="mx-auto max-w-5xl">
