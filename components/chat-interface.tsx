@@ -462,7 +462,7 @@ export function ChatInterface({
                   {isTrialMode &&
                     trialMessagesRemaining !== null &&
                     trialMessagesRemaining > 0 && (
-                      <span className="font-medium text-primary/70">
+                      <span className="font-medium text-primary">
                         {trialMessagesRemaining} free{" "}
                         {trialMessagesRemaining === 1
                           ? "message"
@@ -499,7 +499,7 @@ export function ChatInterface({
                       {msg.role === "assistant" ? (
                         /* ── Assistant message ── */
                         <div>
-                          <p className="font-display mb-2 text-xs font-semibold uppercase tracking-wide text-primary/60">
+                          <p className="font-display mb-2 text-xs font-semibold uppercase tracking-wide text-primary">
                             Vera
                           </p>
                           <div className="prose prose-sm max-w-none text-[0.9375rem] leading-[1.7] text-foreground/90 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:tracking-tight [&_h2]:text-base [&_h2]:font-semibold [&_h2]:tracking-tight [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:uppercase [&_h3]:tracking-wide [&_h3]:text-foreground/70 [&_strong]:text-foreground [&_blockquote]:border-primary/20 [&_blockquote]:text-foreground/70 [&_li]:marker:text-primary/40">
