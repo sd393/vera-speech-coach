@@ -14,10 +14,13 @@ import {
   ArrowRight,
   Search,
   ChevronDown,
+  Square,
+  X,
 } from "lucide-react"
 import { AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
 import { useChat, type ResearchMeta } from "@/hooks/use-chat"
+import { useRecorder } from "@/hooks/use-recorder"
 import { FadeIn, motion } from "@/components/motion"
 import {
   Dialog,
@@ -59,8 +62,8 @@ const SUGGESTIONS = [
   {
     icon: Mic,
     label: "Listen to my live presentation",
-    message: "I want you to listen to a live presentation I'm working on.",
-    action: "send" as const,
+    message: "",
+    action: "record" as const,
   },
   {
     icon: Upload,
@@ -184,6 +187,14 @@ export function ChatInterface({
     clearError,
   } = useChat(authToken)
 
+  const {
+    isRecording,
+    elapsed,
+    startRecording,
+    stopRecording,
+    cancelRecording,
+  } = useRecorder()
+
   const [input, setInput] = useState("")
   const [showTrialDialog, setShowTrialDialog] = useState(false)
   const [inputPlaceholder, setInputPlaceholder] = useState("Describe your audience or ask for feedback...")
@@ -216,7 +227,39 @@ export function ChatInterface({
   }, [])
 
   const isBusy = isCompressing || isTranscribing || isResearching || isStreaming
-  const isInputDisabled = isBusy || trialLimitReached
+  const isInputDisabled = isBusy || isRecording || trialLimitReached
+
+  function formatElapsed(seconds: number) {
+    const m = Math.floor(seconds / 60).toString().padStart(2, "0")
+    const s = (seconds % 60).toString().padStart(2, "0")
+    return `${m}:${s}`
+  }
+
+  async function handleStartRecording() {
+    try {
+      await startRecording()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : ""
+      if (msg === "not_allowed") {
+        toast.error("Please allow microphone access to record")
+      } else if (msg === "not_found") {
+        toast.error("No microphone found")
+      } else if (msg === "no_media_support") {
+        toast.error("Your browser doesn't support audio recording")
+      } else {
+        toast.error("Could not start recording")
+      }
+    }
+  }
+
+  async function handleStopRecording() {
+    try {
+      const file = await stopRecording()
+      uploadFile(file)
+    } catch {
+      toast.error("Recording failed")
+    }
+  }
   const isEmptyState =
     messages.length === 1 && messages[0].role === "assistant"
 
@@ -421,6 +464,8 @@ export function ChatInterface({
                         onClick={() => {
                           if (s.action === "upload") {
                             fileInputRef.current?.click()
+                          } else if (s.action === "record") {
+                            handleStartRecording()
                           } else {
                             setInput("")
                             sendMessage(s.message)
@@ -633,8 +678,46 @@ export function ChatInterface({
         aria-label="Upload video or audio file"
       />
 
+      {/* Recording bar */}
+      {isRecording && (
+        <div className="flex-shrink-0 px-6 pb-4 pt-2">
+          <div className="mx-auto flex max-w-2xl items-center justify-between rounded-2xl border border-red-500/30 bg-red-500/5 px-5 py-3">
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-3 w-3">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
+              </span>
+              <span className="text-sm font-medium text-foreground">
+                Recording...
+              </span>
+              <span className="font-mono text-sm tabular-nums text-muted-foreground">
+                {formatElapsed(elapsed)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={cancelRecording}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Cancel recording"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleStopRecording}
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500 text-white transition-colors hover:bg-red-600"
+                aria-label="Stop recording"
+              >
+                <Square className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Input bar — hidden during empty state since it's inline above */}
-      {!isEmptyState && <div className="flex-shrink-0 px-6 pb-4 pt-2">
+      {!isEmptyState && !isRecording && <div className="flex-shrink-0 px-6 pb-4 pt-2">
         <form
           onSubmit={handleSubmit}
           className="mx-auto flex max-w-2xl items-center"
