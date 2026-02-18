@@ -396,6 +396,16 @@ export function useChat(authToken?: string | null) {
         const data = await response.json()
         const newTranscript = data.transcript as string
 
+        if (!newTranscript.trim()) {
+          // Silent/blank recording — remove the dangling upload message
+          const rolled = updatedMessages.slice(0, -1)
+          messagesRef.current = rolled
+          setMessages(rolled)
+          setIsTranscribing(false)
+          setError('No speech detected in the recording. Please try again with a recording that contains audible speech.')
+          return
+        }
+
         setTranscript(newTranscript)
         setIsTranscribing(false)
 
