@@ -87,56 +87,68 @@ export function SlideFeedbackCard({
         </div>
       )}
 
-      {/* Collapsible sections */}
-      <div className="border-t border-border/60">
-        {/* Strengths */}
-        <button
-          type="button"
-          onClick={() => setStrengthsOpen(!strengthsOpen)}
-          className="flex w-full items-center gap-2 px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-emerald-600 transition-colors hover:bg-emerald-500/5"
-        >
-          {strengthsOpen ? (
-            <ChevronDown className="h-3.5 w-3.5" />
-          ) : (
-            <ChevronRight className="h-3.5 w-3.5" />
+      {/* Collapsible sections — only rendered when non-empty */}
+      {(feedback.strengths.length > 0 || feedback.improvements.length > 0) && (
+        <div className="border-t border-border/60">
+          {/* Strengths */}
+          {feedback.strengths.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setStrengthsOpen(!strengthsOpen)}
+                className="flex w-full items-center gap-2 px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-emerald-600 transition-colors hover:bg-emerald-500/5"
+              >
+                {strengthsOpen ? (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5" />
+                )}
+                Strengths
+              </button>
+              {strengthsOpen && (
+                <ul className="px-5 pb-3">
+                  {feedback.strengths.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2 py-1 text-sm text-foreground/80">
+                      <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" />
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
-          Strengths
-        </button>
-        {strengthsOpen && (
-          <ul className="px-5 pb-3">
-            {feedback.strengths.map((s, i) => (
-              <li key={i} className="flex items-start gap-2 py-1 text-sm text-foreground/80">
-                <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" />
-                {s}
-              </li>
-            ))}
-          </ul>
-        )}
 
-        {/* Improvements */}
-        <button
-          type="button"
-          onClick={() => setImprovementsOpen(!improvementsOpen)}
-          className="flex w-full items-center gap-2 border-t border-border/60 px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-amber-600 transition-colors hover:bg-amber-500/5"
-        >
-          {improvementsOpen ? (
-            <ChevronDown className="h-3.5 w-3.5" />
-          ) : (
-            <ChevronRight className="h-3.5 w-3.5" />
+          {/* Improvements */}
+          {feedback.improvements.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setImprovementsOpen(!improvementsOpen)}
+                className={`flex w-full items-center gap-2 px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-amber-600 transition-colors hover:bg-amber-500/5 ${
+                  feedback.strengths.length > 0 ? "border-t border-border/60" : ""
+                }`}
+              >
+                {improvementsOpen ? (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5" />
+                )}
+                Improvements
+              </button>
+              {improvementsOpen && (
+                <ul className="px-5 pb-4">
+                  {feedback.improvements.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2 py-1 text-sm text-foreground/80">
+                      <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-500" />
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
-          Improvements
-        </button>
-        {improvementsOpen && (
-          <ul className="px-5 pb-4">
-            {feedback.improvements.map((s, i) => (
-              <li key={i} className="flex items-start gap-2 py-1 text-sm text-foreground/80">
-                <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-500" />
-                {s}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
