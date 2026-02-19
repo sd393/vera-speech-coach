@@ -12,6 +12,8 @@ import {
   Upload,
   FileText,
   Mic,
+  Square,
+  X,
   ArrowRight,
   Search,
   ChevronDown,
@@ -22,6 +24,7 @@ import { toast } from "sonner"
 
 import { useChat, type ResearchMeta, type Attachment } from "@/hooks/use-chat"
 import { useSlideReview, type DeckFeedback, type SlideFeedback } from "@/hooks/use-slide-review"
+import { useRecorder } from "@/hooks/use-recorder"
 import { FadeIn, motion } from "@/components/motion"
 import { SlidePanel } from "@/components/slide-panel"
 import {
@@ -37,6 +40,12 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatElapsed(seconds: number): string {
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0')
+  const s = (seconds % 60).toString().padStart(2, '0')
+  return `${m}:${s}`
 }
 
 function formatSlideContextForChat(deck: DeckFeedback, feedbacks: SlideFeedback[]): string {
@@ -73,6 +82,47 @@ function formatSlideContextForChat(deck: DeckFeedback, feedbacks: SlideFeedback[
   return lines.join('\n')
 }
 
+/* ── Waveform visualization (reads real audio levels from AnalyserNode) ── */
+
+function AudioWaveform({ analyser }: { analyser: AnalyserNode | null }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!analyser || !containerRef.current) return
+    const bars = Array.from(
+      containerRef.current.querySelectorAll('[data-bar]')
+    ) as HTMLElement[]
+    const dataArray = new Uint8Array(analyser.frequencyBinCount)
+    let rafId: number
+
+    function update() {
+      analyser.getByteFrequencyData(dataArray)
+      const step = Math.max(1, Math.floor(dataArray.length / bars.length))
+      bars.forEach((bar, i) => {
+        const value = dataArray[i * step] / 255
+        bar.style.height = `${Math.max(3, Math.round(value * 22))}px`
+      })
+      rafId = requestAnimationFrame(update)
+    }
+
+    rafId = requestAnimationFrame(update)
+    return () => cancelAnimationFrame(rafId)
+  }, [analyser])
+
+  return (
+    <div ref={containerRef} className="flex w-[90%] mx-auto items-center justify-between overflow-hidden">
+      {Array.from({ length: 56 }).map((_, i) => (
+        <div
+          key={i}
+          data-bar=""
+          className="w-0.5 flex-shrink-0 rounded-full bg-primary/70"
+          style={{ height: '3px' }}
+        />
+      ))}
+    </div>
+  )
+}
+
 /* ── Empty-state starter prompts ── */
 
 const AUDIENCES = [
@@ -97,8 +147,7 @@ const SUGGESTIONS = [
   {
     icon: Mic,
     label: "Listen to my live presentation",
-    message: "I want you to listen to a live presentation I'm working on.",
-    action: "send" as const,
+    action: "record" as const,
   },
   {
     icon: Upload,
@@ -226,6 +275,7 @@ export function ChatInterface({
 
   const slideReview = useSlideReview(authToken)
   const hasSlidePanel = slideReview.panelOpen
+  const recorder = useRecorder()
 
   const [input, setInput] = useState("")
   const [showTrialDialog, setShowTrialDialog] = useState(false)
@@ -267,7 +317,7 @@ export function ChatInterface({
   }, [])
 
   const isBusy = isCompressing || isTranscribing || isResearching || isStreaming
-  const isInputDisabled = isBusy || trialLimitReached || slideReview.isAnalyzing
+  const isInputDisabled = isBusy || trialLimitReached || slideReview.isAnalyzing || recorder.isRecording
   const isEmptyState = messages.length === 1 && messages[0].role === "assistant"
 
   useEffect(() => {
@@ -328,7 +378,6 @@ export function ChatInterface({
   }
 
   function handlePdfAnalysis(file: File) {
-    // Add a message to the chat timeline so the upload is visible in history
     const attachment: Attachment = { name: file.name, type: file.type || 'application/pdf', size: file.size }
     const messageId = addMessage('', attachment)
     slideReview.uploadAndAnalyze(file, undefined, messageId)
@@ -353,9 +402,29 @@ export function ChatInterface({
     if (pdfInputRef.current) pdfInputRef.current.value = ""
   }
 
-  function handleSuggestionClick(
-    s: (typeof SUGGESTIONS)[number]
-  ) {
+  async function handleStartRecording() {
+    if (isTrialMode) {
+      router.push("/login")
+      return
+    }
+    const err = await recorder.startRecording()
+    if (err) {
+      const messages: Record<string, string> = {
+        not_allowed: "Please allow microphone access to record",
+        not_found: "No microphone found",
+        no_media_support: "Your browser doesn't support audio recording",
+        unknown: "Could not start recording",
+      }
+      toast.error(messages[err] ?? "Could not start recording")
+    }
+  }
+
+  async function handleStopRecording() {
+    const file = await recorder.stopRecording()
+    if (file) uploadFile(file)
+  }
+
+  function handleSuggestionClick(s: (typeof SUGGESTIONS)[number]) {
     if (isTrialMode) {
       router.push("/login")
       return
@@ -364,17 +433,120 @@ export function ChatInterface({
       pdfInputRef.current?.click()
     } else if (s.action === "upload") {
       fileInputRef.current?.click()
-    } else {
-      setInput("")
-      sendMessage(s.message)
+    } else if (s.action === "record") {
+      handleStartRecording()
     }
   }
 
   /* ─────────────────────────────────────────────────
-     Shared sub-pieces (used in both layout branches)
+     Shared input bar — used in both layout branches
   ───────────────────────────────────────────────── */
 
-  // The message feed — identical in both layouts
+  // Shared recording overlay content (same in both input bars)
+  const recordingContent = (
+    <div className="flex w-full items-center gap-2 px-3">
+      {/* Pulsing red indicator */}
+      <div className="relative flex-shrink-0">
+        <div className="h-2 w-2 rounded-full bg-red-500" />
+        <div className="absolute inset-0 animate-ping rounded-full bg-red-500/60" />
+      </div>
+      {/* Real-time waveform */}
+      <div className="flex-1 min-w-0">
+        <AudioWaveform analyser={recorder.analyserNode} />
+      </div>
+      {/* Elapsed time */}
+      <span className="flex-shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+        {formatElapsed(recorder.elapsed)}
+      </span>
+      {/* Cancel */}
+      <button
+        type="button"
+        onClick={recorder.cancelRecording}
+        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
+        aria-label="Cancel recording"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+      {/* Stop + upload */}
+      <button
+        type="button"
+        onClick={handleStopRecording}
+        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-red-500 text-white transition-colors hover:bg-red-600"
+        aria-label="Stop recording and send"
+      >
+        <Square className="h-3 w-3 fill-current" />
+      </button>
+    </div>
+  )
+
+  // The compact input bar (active chat)
+  const compactInputBar = (
+    <div className="flex-shrink-0 px-4 pb-4 pt-2 sm:px-6">
+      <form onSubmit={handleSubmit} className="mx-auto max-w-2xl">
+        <div
+          className={`relative flex h-12 sm:h-14 items-center overflow-hidden rounded-2xl border bg-muted transition-colors ${
+            recorder.isRecording
+              ? "border-red-500/40"
+              : "border-border focus-within:border-primary/30 focus-within:ring-1 focus-within:ring-primary/20"
+          }`}
+        >
+          {recorder.isRecording ? recordingContent : (
+            <>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isBusy || trialLimitReached || slideReview.isAnalyzing}
+                className="absolute left-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                aria-label="Attach a file"
+              >
+                <Paperclip className="h-4 w-4" />
+              </button>
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSubmit(e)
+                  }
+                }}
+                placeholder={inputPlaceholder}
+                rows={1}
+                disabled={isInputDisabled}
+                className="h-full w-full resize-none bg-transparent py-3 pl-12 pr-20 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-50 sm:py-3.5"
+              />
+              <button
+                type="button"
+                onClick={handleStartRecording}
+                disabled={isBusy || trialLimitReached || slideReview.isAnalyzing || !!input.trim()}
+                className="absolute right-11 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+                aria-label="Start recording"
+              >
+                <Mic className="h-4 w-4" />
+              </button>
+              <button
+                type="submit"
+                disabled={!input.trim() || isInputDisabled}
+                className="absolute right-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
+                aria-label="Send message"
+              >
+                {isBusy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </button>
+            </>
+          )}
+        </div>
+      </form>
+    </div>
+  )
+
+  /* ─────────────────────────────────────────────────
+     Message feed
+  ───────────────────────────────────────────────── */
+
   const messagesFeed = (
     <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
       <div className="mx-auto flex max-w-2xl flex-col gap-8">
@@ -389,7 +561,6 @@ export function ChatInterface({
             isPdfAttachment &&
             slideReview.activeReviewKey === msg.id &&
             slideReview.isAnalyzing
-          // Hide the button only when this message is already what's shown in the open panel
           const isCurrentlyShown =
             slideReview.displayedKey === msg.id && slideReview.panelOpen
           return (
@@ -517,51 +688,6 @@ export function ChatInterface({
     </div>
   )
 
-  // The compact input bar (active chat and slide-panel sidebar)
-  const compactInputBar = (
-    <div className="flex-shrink-0 px-4 pb-4 pt-2 sm:px-6">
-      <form onSubmit={handleSubmit} className="mx-auto max-w-2xl">
-        <div className="relative flex items-center">
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isInputDisabled}
-            className="absolute left-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-            aria-label="Attach a file"
-          >
-            <Paperclip className="h-4 w-4" />
-          </button>
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault()
-                handleSubmit(e)
-              }
-            }}
-            placeholder={inputPlaceholder}
-            rows={1}
-            disabled={isInputDisabled}
-            className="h-12 w-full resize-none rounded-2xl border border-border bg-muted py-3 pl-12 pr-12 text-sm text-foreground placeholder:text-muted-foreground/60 transition-colors focus:border-primary/30 focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50 sm:h-14 sm:py-3.5"
-          />
-          <button
-            type="submit"
-            disabled={!input.trim() || isInputDisabled}
-            className="absolute right-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
-            aria-label="Send message"
-          >
-            {isBusy ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </button>
-        </div>
-      </form>
-    </div>
-  )
-
   /* ─────────────────────────────────────────────────
      Unified layout — slide panel slides in from right
   ───────────────────────────────────────────────── */
@@ -659,42 +785,61 @@ export function ChatInterface({
 
                 <FadeIn delay={0.25}>
                   <form onSubmit={handleSubmit} className="mt-10 w-full max-w-3xl">
-                    <div className="relative flex items-center">
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isInputDisabled}
-                        className="absolute left-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-                        aria-label="Attach a file"
-                      >
-                        <Paperclip className="h-4 w-4" />
-                      </button>
-                      <textarea
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault()
-                            handleSubmit(e)
-                          }
-                        }}
-                        placeholder={inputPlaceholder}
-                        rows={1}
-                        disabled={isInputDisabled}
-                        className="h-12 w-full resize-none rounded-2xl border border-border bg-muted py-3 pl-14 pr-14 text-sm text-foreground placeholder:text-muted-foreground/60 transition-colors focus:border-primary/30 focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50 sm:h-14 sm:pl-12 sm:pr-14 sm:py-3.5 sm:text-base"
-                      />
-                      <button
-                        type="submit"
-                        disabled={!input.trim() || isInputDisabled}
-                        className="absolute right-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
-                        aria-label="Send message"
-                      >
-                        {isBusy ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Send className="h-4 w-4" />
-                        )}
-                      </button>
+                    <div
+                      className={`relative flex h-12 sm:h-14 items-center overflow-hidden rounded-2xl border bg-muted transition-colors ${
+                        recorder.isRecording
+                          ? "border-red-500/40"
+                          : "border-border focus-within:border-primary/30 focus-within:ring-1 focus-within:ring-primary/20"
+                      }`}
+                    >
+                      {recorder.isRecording ? recordingContent : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isInputDisabled}
+                            className="absolute left-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                            aria-label="Attach a file"
+                          >
+                            <Paperclip className="h-4 w-4" />
+                          </button>
+                          <textarea
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault()
+                                handleSubmit(e)
+                              }
+                            }}
+                            placeholder={inputPlaceholder}
+                            rows={1}
+                            disabled={isInputDisabled}
+                            className="h-full w-full resize-none bg-transparent py-3 pl-14 pr-20 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-50 sm:pl-12 sm:py-3.5 sm:text-base"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleStartRecording}
+                            disabled={isBusy || trialLimitReached || slideReview.isAnalyzing || !!input.trim()}
+                            className="absolute right-11 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+                            aria-label="Start recording"
+                          >
+                            <Mic className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={!input.trim() || isInputDisabled}
+                            className="absolute right-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
+                            aria-label="Send message"
+                          >
+                            {isBusy ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Send className="h-4 w-4" />
+                            )}
+                          </button>
+                        </>
+                      )}
                     </div>
 
                     <div className="mt-3 flex flex-wrap justify-center gap-2 px-1">
