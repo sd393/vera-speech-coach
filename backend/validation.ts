@@ -60,6 +60,42 @@ export const transcribeRequestSchema = z.object({
   fileName: z.string().min(1).max(255),
 })
 
+export const MAX_SLIDE_FILE_SIZE = 50 * 1024 * 1024 // 50MB
+
+export function validateSlideFile(
+  file: { name: string; type: string; size: number }
+): { valid: true } | { valid: false; error: string } {
+  if (file.size === 0) {
+    return { valid: false, error: 'File is empty' }
+  }
+
+  if (file.size > MAX_SLIDE_FILE_SIZE) {
+    return {
+      valid: false,
+      error: `File size exceeds 50MB limit (${(file.size / (1024 * 1024)).toFixed(1)}MB)`,
+    }
+  }
+
+  const name = file.name.toLowerCase()
+  const extValid = name.endsWith('.pdf')
+  const mimeValid = file.type === 'application/pdf'
+
+  if (!extValid && !mimeValid) {
+    return {
+      valid: false,
+      error: 'Unsupported file type. Please upload a PDF file.',
+    }
+  }
+
+  return { valid: true }
+}
+
+export const slideAnalyzeRequestSchema = z.object({
+  blobUrl: z.string().url(),
+  fileName: z.string().min(1).max(255),
+  audienceContext: z.string().max(2_000).optional(),
+})
+
 export function sanitizeInput(text: string): string {
   return text.trim()
 }

@@ -5,7 +5,7 @@ import { upload } from '@vercel/blob/client'
 import { validateFile } from '@/backend/validation'
 import { shouldExtractClientSide, extractAudioClientSide } from '@/lib/client-audio'
 
-interface Attachment {
+export interface Attachment {
   name: string
   type: string
   size: number
@@ -416,6 +416,23 @@ export function useChat(authToken?: string | null) {
     [streamChatResponse]
   )
 
+  // Add a message to the timeline without triggering a chat completion.
+  // Used for PDF uploads that open the slide panel instead of sending to the AI.
+  const addMessage = useCallback(
+    (content: string, attachment?: Attachment) => {
+      const message: Message = {
+        id: generateId(),
+        role: 'user',
+        content,
+        ...(attachment ? { attachment } : {}),
+      }
+      const updated = [...messagesRef.current, message]
+      messagesRef.current = updated
+      setMessages(updated)
+    },
+    []
+  )
+
   const clearError = useCallback(() => {
     setError(null)
   }, [])
@@ -448,6 +465,7 @@ export function useChat(authToken?: string | null) {
     trialLimitReached,
     sendMessage,
     uploadFile,
+    addMessage,
     clearError,
     resetConversation,
   }

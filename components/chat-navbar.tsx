@@ -22,14 +22,12 @@ export function ChatNavbar({ isTrialMode }: ChatNavbarProps) {
               Sign in
             </a>
           ) : (
-            <>
-              <Link
-                href="/account"
-                className="text-sm font-medium text-foreground transition-colors hover:text-foreground/80"
-              >
-                Account
-              </Link>
-            </>
+            <Link
+              href="/account"
+              className="text-sm font-medium text-foreground transition-colors hover:text-foreground/80"
+            >
+              Account
+            </Link>
           )}
         </div>
       </div>
