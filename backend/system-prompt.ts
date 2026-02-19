@@ -76,16 +76,34 @@ ${transcript}
 """`
 }
 
+function buildSlideDeckPhase(slideContext: string): string {
+  return `CURRENT PHASE: Slide Deck Review Coaching
+The user has uploaded a slide deck and you have already analyzed it. The full analysis is below.
+Use it to answer follow-up questions, provide deeper coaching, and help them improve the deck.
+Reference specific slide numbers and titles when giving advice.
+If the user asks about a slide you analyzed, quote your findings. If they ask for general coaching, draw on the top priorities and executive summary.
+
+SLIDE DECK ANALYSIS:
+---
+${slideContext}
+---`
+}
+
 export function buildSystemPrompt(
   transcript?: string,
-  researchContext?: string
+  researchContext?: string,
+  slideContext?: string,
 ): string {
-  const phaseInstructions =
-    transcript === undefined
-      ? PHASE_1_NO_TRANSCRIPT
-      : !transcript.trim()
-        ? PHASE_2_EMPTY_TRANSCRIPT
-        : buildPhase2WithTranscript(transcript, researchContext)
+  let phaseInstructions: string
+  if (transcript !== undefined) {
+    phaseInstructions = !transcript.trim()
+      ? PHASE_2_EMPTY_TRANSCRIPT
+      : buildPhase2WithTranscript(transcript, researchContext)
+  } else if (slideContext) {
+    phaseInstructions = buildSlideDeckPhase(slideContext)
+  } else {
+    phaseInstructions = PHASE_1_NO_TRANSCRIPT
+  }
 
   return [BASE_IDENTITY, phaseInstructions, RULES].join('\n\n')
 }

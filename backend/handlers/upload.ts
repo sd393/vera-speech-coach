@@ -18,12 +18,10 @@ export async function handleUploadRoute(request: NextRequest) {
       request,
       onBeforeGenerateToken: async (_pathname) => {
         return {
-          allowedContentTypes: ['audio/*', 'video/*'],
+          allowedContentTypes: ['audio/*', 'video/*', 'application/pdf'],
           maximumSizeInBytes: 500 * 1024 * 1024, // 500MB
+          addRandomSuffix: true,
         }
-      },
-      onUploadCompleted: async () => {
-        // No action needed — transcribe handler will process and delete the blob
       },
     })
 

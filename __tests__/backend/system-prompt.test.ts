@@ -60,4 +60,24 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('CLOSING')
     expect(prompt).toContain('OVERALL IMPRESSION')
   })
+
+  it('uses slide deck phase when slideContext provided but no transcript', () => {
+    const slideCtx = 'Deck: "Q4 Strategy"\nOverall Score: 72/100'
+    const prompt = buildSystemPrompt(undefined, undefined, slideCtx)
+    expect(prompt).toContain('SLIDE DECK ANALYSIS')
+    expect(prompt).toContain(slideCtx)
+    expect(prompt).not.toContain('TRANSCRIPT:')
+    expect(prompt).not.toContain('not yet uploaded')
+  })
+
+  it('prefers transcript phase over slide deck phase when both provided', () => {
+    const prompt = buildSystemPrompt('the transcript', undefined, 'some slide context')
+    expect(prompt).toContain('TRANSCRIPT:')
+    expect(prompt).not.toContain('SLIDE DECK ANALYSIS')
+  })
+
+  it('falls back to welcome phase when neither transcript nor slideContext provided', () => {
+    const prompt = buildSystemPrompt(undefined, undefined, undefined)
+    expect(prompt).toContain('not yet uploaded')
+  })
 })

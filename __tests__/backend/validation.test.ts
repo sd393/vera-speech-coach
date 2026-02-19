@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { validateFile, chatRequestSchema, sanitizeInput } from '@/backend/validation'
+import {
+  validateFile,
+  validateSlideFile,
+  chatRequestSchema,
+  slideAnalyzeRequestSchema,
+  sanitizeInput,
+} from '@/backend/validation'
 
 describe('validateFile', () => {
   it('rejects files over 500MB', () => {
@@ -172,6 +178,25 @@ describe('chatRequestSchema', () => {
     })
     expect(result.success).toBe(false)
   })
+
+  it('accepts optional slideContext field', () => {
+    const result = chatRequestSchema.safeParse({
+      messages: [{ role: 'user', content: 'Tell me about my deck' }],
+      slideContext: 'Deck: "Q4 Strategy"\nOverall Score: 72/100',
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.slideContext).toBe('Deck: "Q4 Strategy"\nOverall Score: 72/100')
+    }
+  })
+
+  it('rejects slideContext exceeding 30,000 chars', () => {
+    const result = chatRequestSchema.safeParse({
+      messages: [{ role: 'user', content: 'Hello' }],
+      slideContext: 'x'.repeat(30_001),
+    })
+    expect(result.success).toBe(false)
+  })
 })
 
 describe('sanitizeInput', () => {
@@ -189,5 +214,122 @@ describe('sanitizeInput', () => {
 
   it('preserves internal whitespace', () => {
     expect(sanitizeInput('hello   world')).toBe('hello   world')
+  })
+})
+
+describe('validateSlideFile', () => {
+  it('accepts a valid PDF by MIME type', () => {
+    const result = validateSlideFile({
+      name: 'deck.pdf',
+      type: 'application/pdf',
+      size: 1024 * 1024,
+    })
+    expect(result.valid).toBe(true)
+  })
+
+  it('accepts a valid PDF by extension even with generic MIME', () => {
+    const result = validateSlideFile({
+      name: 'deck.pdf',
+      type: 'application/octet-stream',
+      size: 1024 * 1024,
+    })
+    expect(result.valid).toBe(true)
+  })
+
+  it('rejects empty files', () => {
+    const result = validateSlideFile({
+      name: 'deck.pdf',
+      type: 'application/pdf',
+      size: 0,
+    })
+    expect(result.valid).toBe(false)
+    if (!result.valid) {
+      expect(result.error).toContain('empty')
+    }
+  })
+
+  it('rejects files over 50MB', () => {
+    const result = validateSlideFile({
+      name: 'deck.pdf',
+      type: 'application/pdf',
+      size: 51 * 1024 * 1024,
+    })
+    expect(result.valid).toBe(false)
+    if (!result.valid) {
+      expect(result.error).toContain('50MB')
+    }
+  })
+
+  it('accepts files at exactly 50MB', () => {
+    const result = validateSlideFile({
+      name: 'deck.pdf',
+      type: 'application/pdf',
+      size: 50 * 1024 * 1024,
+    })
+    expect(result.valid).toBe(true)
+  })
+
+  it('rejects non-PDF files', () => {
+    const result = validateSlideFile({
+      name: 'presentation.pptx',
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      size: 1024 * 1024,
+    })
+    expect(result.valid).toBe(false)
+    if (!result.valid) {
+      expect(result.error).toContain('PDF')
+    }
+  })
+
+  it('rejects video files', () => {
+    const result = validateSlideFile({
+      name: 'video.mp4',
+      type: 'video/mp4',
+      size: 1024 * 1024,
+    })
+    expect(result.valid).toBe(false)
+  })
+})
+
+describe('slideAnalyzeRequestSchema', () => {
+  it('validates a minimal valid request', () => {
+    const result = slideAnalyzeRequestSchema.safeParse({
+      blobUrl: 'https://example.vercel-storage.com/deck.pdf',
+      fileName: 'deck.pdf',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts optional audienceContext', () => {
+    const result = slideAnalyzeRequestSchema.safeParse({
+      blobUrl: 'https://example.vercel-storage.com/deck.pdf',
+      fileName: 'deck.pdf',
+      audienceContext: 'Series A investors',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects invalid blobUrl', () => {
+    const result = slideAnalyzeRequestSchema.safeParse({
+      blobUrl: 'not-a-url',
+      fileName: 'deck.pdf',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects missing fileName', () => {
+    const result = slideAnalyzeRequestSchema.safeParse({
+      blobUrl: 'https://example.vercel-storage.com/deck.pdf',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects audienceContext exceeding 2000 chars', () => {
+    const result = slideAnalyzeRequestSchema.safeParse({
+      blobUrl: 'https://example.vercel-storage.com/deck.pdf',
+      fileName: 'deck.pdf',
+      audienceContext: 'x'.repeat(2001),
+    })
+    expect(result.success).toBe(false)
   })
 })

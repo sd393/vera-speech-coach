@@ -5,7 +5,7 @@ import { upload } from '@vercel/blob/client'
 import { validateFile } from '@/backend/validation'
 import { shouldExtractClientSide, extractAudioClientSide } from '@/lib/client-audio'
 
-interface Attachment {
+export interface Attachment {
   name: string
   type: string
   size: number
@@ -40,6 +40,7 @@ export function useChat(authToken?: string | null) {
   const [transcript, setTranscript] = useState<string | null>(null)
   const [researchContext, setResearchContext] = useState<string | null>(null)
   const [researchMeta, setResearchMeta] = useState<ResearchMeta | null>(null)
+  const [slideContext, setSlideContext] = useState<string | null>(null)
   const [isCompressing, setIsCompressing] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [isResearching, setIsResearching] = useState(false)
@@ -53,12 +54,14 @@ export function useChat(authToken?: string | null) {
   const messagesRef = useRef<Message[]>([INITIAL_MESSAGE])
   const transcriptRef = useRef<string | null>(null)
   const researchContextRef = useRef<string | null>(null)
+  const slideContextRef = useRef<string | null>(null)
   const authTokenRef = useRef<string | null>(null)
 
   // Keep refs in sync with state on each render
   messagesRef.current = messages
   transcriptRef.current = transcript
   researchContextRef.current = researchContext
+  slideContextRef.current = slideContext
   authTokenRef.current = authToken ?? null
 
   // On mount for trial users, check cookie for prior trial usage
@@ -110,12 +113,15 @@ export function useChat(authToken?: string | null) {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            messages: currentMessages.map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
+            messages: currentMessages
+              .filter((m) => m.content !== '')
+              .map((m) => ({
+                role: m.role,
+                content: m.content,
+              })),
             transcript: currentTranscript ?? undefined,
             researchContext: researchContextRef.current ?? undefined,
+            slideContext: slideContextRef.current ?? undefined,
           }),
           signal: controller.signal,
         })
@@ -416,6 +422,26 @@ export function useChat(authToken?: string | null) {
     [streamChatResponse]
   )
 
+  // Add a message to the timeline without triggering a chat completion.
+  // Used for PDF uploads that open the slide panel instead of sending to the AI.
+  // Returns the generated message ID so callers can associate state with this message.
+  const addMessage = useCallback(
+    (content: string, attachment?: Attachment): string => {
+      const id = generateId()
+      const message: Message = {
+        id,
+        role: 'user',
+        content,
+        ...(attachment ? { attachment } : {}),
+      }
+      const updated = [...messagesRef.current, message]
+      messagesRef.current = updated
+      setMessages(updated)
+      return id
+    },
+    []
+  )
+
   const clearError = useCallback(() => {
     setError(null)
   }, [])
@@ -426,7 +452,9 @@ export function useChat(authToken?: string | null) {
     setTranscript(null)
     setResearchContext(null)
     setResearchMeta(null)
+    setSlideContext(null)
     researchContextRef.current = null
+    slideContextRef.current = null
     setIsCompressing(false)
     setIsTranscribing(false)
     setIsResearching(false)
@@ -439,6 +467,7 @@ export function useChat(authToken?: string | null) {
     transcript,
     researchContext,
     researchMeta,
+    slideContext,
     isCompressing,
     isTranscribing,
     isResearching,
@@ -448,6 +477,8 @@ export function useChat(authToken?: string | null) {
     trialLimitReached,
     sendMessage,
     uploadFile,
+    addMessage,
+    setSlideContext,
     clearError,
     resetConversation,
   }
