@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { ChatNavbar } from "@/components/chat-navbar"
-import { ChatInterface } from "@/components/chat-interface"
+import { CoachingInterface } from "@/components/coaching-interface"
 
 export default function ChatPage() {
   const { user, loading } = useAuth()
@@ -30,7 +30,7 @@ export default function ChatPage() {
   return (
     <div className="flex h-screen flex-col">
       <ChatNavbar isTrialMode={isTrialMode} />
-      <ChatInterface
+      <CoachingInterface
         authToken={isTrialMode ? null : idToken}
         isTrialMode={isTrialMode}
       />

@@ -1,0 +1,747 @@
+"use client"
+
+import React, { useState, useRef, useEffect, type FormEvent } from "react"
+import { useRouter } from "next/navigation"
+import ReactMarkdown from "react-markdown"
+import {
+  Send,
+  Paperclip,
+  FileVideo,
+  FileAudio,
+  Loader2,
+  Upload,
+  FileText,
+  Mic,
+  Square,
+  X,
+  ArrowRight,
+  Search,
+  ChevronDown,
+} from "lucide-react"
+import { AnimatePresence, motion } from "framer-motion"
+import { toast } from "sonner"
+
+import { useChat, type ResearchMeta, type Attachment } from "@/hooks/use-chat"
+import { useRecorder } from "@/hooks/use-recorder"
+import { useSlideReview, type DeckFeedback, type SlideFeedback } from "@/hooks/use-slide-review"
+import { FadeIn } from "@/components/motion"
+import { SlidePanel } from "@/components/slide-panel"
+import { AudienceFace, type FaceState } from "@/components/audience-face"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+
+/* ── Utilities ── */
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatElapsed(seconds: number): string {
+  const m = Math.floor(seconds / 60).toString().padStart(2, "0")
+  const s = (seconds % 60).toString().padStart(2, "0")
+  return `${m}:${s}`
+}
+
+function formatSlideContextForChat(deck: DeckFeedback, feedbacks: SlideFeedback[]): string {
+  const lines: string[] = [
+    `Deck: "${deck.deckTitle}"`,
+    `Overall Score: ${deck.overallRating}/100`,
+    `Audience Assumed: ${deck.audienceAssumed}`,
+    ``,
+    `Executive Summary:`,
+    deck.executiveSummary,
+    ``,
+    `Top Priorities:`,
+    ...deck.topPriorities.map((p, i) => `${i + 1}. ${p}`),
+    ``,
+    `Slide-by-Slide Feedback:`,
+  ]
+  for (const f of feedbacks) {
+    const ratingLabel = f.rating === "needs-work" ? "NEEDS WORK" : f.rating.toUpperCase()
+    lines.push(``)
+    lines.push(`Slide ${f.slideNumber}: "${f.title}" — ${ratingLabel}`)
+    lines.push(`  ${f.headline}`)
+    if (f.quote) lines.push(`  (Quote from slide: "${f.quote}")`)
+    if (f.strengths.length > 0) {
+      lines.push(`  Strengths:`)
+      f.strengths.forEach((s) => lines.push(`    - ${s}`))
+    }
+    if (f.improvements.length > 0) {
+      lines.push(`  Improvements:`)
+      f.improvements.forEach((s) => lines.push(`    - ${s}`))
+    }
+  }
+  return lines.join("\n")
+}
+
+/* ── Waveform ── */
+
+function AudioWaveform({ analyser }: { analyser: AnalyserNode | null }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!analyser || !containerRef.current) return
+    const a = analyser
+    const bars = Array.from(containerRef.current.querySelectorAll("[data-bar]")) as HTMLElement[]
+    const dataArray = new Uint8Array(a.frequencyBinCount)
+    let rafId: number
+    function update() {
+      a.getByteFrequencyData(dataArray)
+      const step = Math.max(1, Math.floor(dataArray.length / bars.length))
+      bars.forEach((bar, i) => {
+        const value = dataArray[i * step] / 255
+        bar.style.height = `${Math.max(3, Math.round(value * 22))}px`
+      })
+      rafId = requestAnimationFrame(update)
+    }
+    rafId = requestAnimationFrame(update)
+    return () => cancelAnimationFrame(rafId)
+  }, [analyser])
+
+  return (
+    <div ref={containerRef} className="flex w-[90%] mx-auto items-center justify-between overflow-hidden">
+      {Array.from({ length: 56 }).map((_, i) => (
+        <div key={i} data-bar="" className="w-0.5 flex-shrink-0 rounded-full bg-primary/70" style={{ height: "3px" }} />
+      ))}
+    </div>
+  )
+}
+
+/* ── Research card ── */
+
+function ResearchCard({ meta }: { meta: ResearchMeta }) {
+  const [isOpen, setIsOpen] = useState(false)
+  return (
+    <div className="rounded-lg border border-border/60 bg-muted/30">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm"
+      >
+        <Search className="h-3.5 w-3.5 text-primary/60" />
+        <span className="font-medium text-white/80">Audience research completed</span>
+        <span className="text-white/50">— {meta.searchTerms.length} searches</span>
+        <ChevronDown className={`ml-auto h-3.5 w-3.5 text-white/50 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </button>
+      {isOpen && (
+        <div className="border-t border-border/60 px-4 py-3 text-sm">
+          <p className="mb-2 font-medium text-white/70">{meta.audienceSummary}</p>
+          <div className="mb-3">
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-white/50">Search terms</p>
+            <div className="flex flex-wrap gap-1.5">
+              {meta.searchTerms.map((term) => (
+                <span key={term} className="rounded-md border border-border/40 bg-background px-2 py-0.5 text-xs text-white/70">{term}</span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-white/50">Briefing</p>
+            <div className="prose prose-sm max-w-none text-xs leading-relaxed text-white/70 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_strong]:text-white [&_strong]:font-semibold">
+              <ReactMarkdown>{meta.briefing}</ReactMarkdown>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Constants ── */
+
+const AUDIENCES = [
+  "investors", "your class", "customers", "your team", "a jury",
+  "prospects", "colleagues", "reviewers", "patients", "delegates",
+]
+
+const SUGGESTIONS = [
+  { icon: FileText, label: "Review my slide deck", action: "upload-pdf" as const },
+  { icon: Mic,      label: "Listen to my live presentation", action: "record" as const },
+  { icon: Upload,   label: "Upload a video or audio recording", action: "upload" as const },
+]
+
+const FOLLOW_UPS_EARLY = [
+  { label: "Define my target audience", message: "Help me clearly define who I'm presenting to — their role, expectations, and what they care about." },
+  { label: "Clarify my key message",    message: "What should be the single most important takeaway my audience remembers?" },
+]
+
+const FOLLOW_UPS_LATER = [
+  { label: "Strengthen my opening",      message: "Help me craft a stronger opening that grabs attention in the first 30 seconds." },
+  { label: "Challenge my weakest point", message: "Play devil's advocate — where would a skeptical audience push back on my argument?" },
+  { label: "Polish my closing",          message: "Help me end with a memorable, actionable closing statement." },
+]
+
+/* ── Props ── */
+
+interface CoachingInterfaceProps {
+  authToken?: string | null
+  isTrialMode?: boolean
+  onChatStart?: () => void
+}
+
+export function CoachingInterface({ authToken, isTrialMode, onChatStart }: CoachingInterfaceProps) {
+  const router = useRouter()
+
+  const {
+    messages, researchMeta, isCompressing, isTranscribing, isResearching, isStreaming,
+    error, trialMessagesRemaining, trialLimitReached,
+    sendMessage, uploadFile, addMessage, setSlideContext, clearError,
+  } = useChat(authToken)
+
+  const recorder = useRecorder()
+  const slideReview = useSlideReview(authToken)
+  const hasSlidePanel = slideReview.panelOpen
+
+  const [input, setInput] = useState("")
+  const [inputPlaceholder, setInputPlaceholder] = useState("Describe your audience or ask for feedback...")
+  const [showTrialDialog, setShowTrialDialog] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const pdfInputRef = useRef<HTMLInputElement>(null)
+
+  /* ── Responsive placeholder ── */
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 640px)")
+    const update = () => setInputPlaceholder(mq.matches ? "Describe your audience or ask for feedback..." : "What's your presentation about?")
+    update()
+    mq.addEventListener("change", update)
+    return () => mq.removeEventListener("change", update)
+  }, [])
+
+  /* ── Audience animation ── */
+  const [audienceIndex, setAudienceIndex] = useState(0)
+  const [audienceWidth, setAudienceWidth] = useState(0)
+  const audienceRefCallback = React.useCallback((node: HTMLSpanElement | null) => {
+    if (node) setAudienceWidth(node.offsetWidth)
+  }, [])
+
+  useEffect(() => {
+    const interval = setInterval(() => setAudienceIndex((prev) => (prev + 1) % AUDIENCES.length), 2000)
+    return () => clearInterval(interval)
+  }, [])
+
+  /* ── Satisfied window + audience pulse ── */
+  const [satisfiedWindow, setSatisfiedWindow] = useState(false)
+  const [pulseLabels, setPulseLabels] = useState<string[]>([])
+  const [pulseIndex, setPulseIndex] = useState(0)
+  const prevStreaming = useRef(false)
+
+  useEffect(() => {
+    if (prevStreaming.current && !isStreaming) {
+      setSatisfiedWindow(true)
+      const t = setTimeout(() => setSatisfiedWindow(false), 2000)
+      prevStreaming.current = false
+
+      const recent = messages
+        .filter(m => m.content.trim())
+        .slice(-4)
+        .map(m => ({ role: m.role as "user" | "assistant", content: m.content }))
+      if (recent.length > 0) {
+        fetch("/api/audience-pulse", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: recent }),
+        })
+          .then(r => r.json())
+          .then(({ labels }) => {
+            const validLabels = Array.isArray(labels)
+              ? labels.filter((l: unknown): l is string => typeof l === "string")
+              : []
+            if (validLabels.length > 0) {
+              setPulseLabels(validLabels)
+              setPulseIndex(0)
+            }
+          })
+          .catch(() => {})
+      }
+
+      return () => clearTimeout(t)
+    }
+    prevStreaming.current = isStreaming
+  }, [isStreaming, messages])
+
+  // Cycle through pulse labels every 4s
+  useEffect(() => {
+    if (pulseLabels.length <= 1) return
+    const t = setInterval(() => setPulseIndex(i => (i + 1) % pulseLabels.length), 4000)
+    return () => clearInterval(t)
+  }, [pulseLabels])
+
+  /* ── Derived state ── */
+  const isBusy = isCompressing || isTranscribing || isResearching || isStreaming
+  const isInputDisabled = isBusy || trialLimitReached || slideReview.isAnalyzing || recorder.isRecording
+  const isEmptyState = messages.length === 1 && messages[0].role === "assistant"
+
+  const faceState: FaceState = recorder.isRecording ? "listening"
+    : (isTranscribing || isResearching) ? "thinking"
+    : isStreaming ? "speaking"
+    : satisfiedWindow ? "satisfied"
+    : "idle"
+
+  const exchangeCount = messages.filter((m) => m.role === "user").length
+  const lastMessage = messages[messages.length - 1]
+  const showFollowUps = !isBusy && !isEmptyState && lastMessage?.role === "assistant" && lastMessage.content.length > 0
+  const followUps = exchangeCount <= 1 ? FOLLOW_UPS_EARLY : FOLLOW_UPS_LATER
+  const faceSize = hasSlidePanel ? 140 : 200
+
+  /* ── Effects ── */
+  useEffect(() => { if (!isEmptyState) onChatStart?.() }, [isEmptyState, onChatStart])
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+  }, [messages, isTranscribing, isStreaming])
+
+  useEffect(() => { if (trialLimitReached) setShowTrialDialog(true) }, [trialLimitReached])
+
+  useEffect(() => {
+    if (error) { toast.error(error); clearError() }
+  }, [error, clearError])
+
+  useEffect(() => { if (slideReview.error) toast.error(slideReview.error) }, [slideReview.error])
+
+  useEffect(() => {
+    if (slideReview.deckSummary && slideReview.slideFeedbacks.length > 0) {
+      setSlideContext(formatSlideContextForChat(slideReview.deckSummary, slideReview.slideFeedbacks))
+    }
+  }, [slideReview.deckSummary, slideReview.slideFeedbacks, setSlideContext])
+
+  /* ── Handlers ── */
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    const trimmed = input.trim()
+    if (!trimmed || isInputDisabled) return
+    setInput("")
+    sendMessage(trimmed)
+  }
+
+  function handlePdfAnalysis(file: File) {
+    const attachment: Attachment = { name: file.name, type: file.type || "application/pdf", size: file.size }
+    const messageId = addMessage("", attachment)
+    slideReview.uploadAndAnalyze(file, undefined, messageId)
+  }
+
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+    isPdf ? handlePdfAnalysis(file) : uploadFile(file)
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  function handlePdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    handlePdfAnalysis(file)
+    if (pdfInputRef.current) pdfInputRef.current.value = ""
+  }
+
+  async function handleStartRecording() {
+    if (isTrialMode) { router.push("/login"); return }
+    const err = await recorder.startRecording()
+    if (err) {
+      const msgs: Record<string, string> = {
+        not_allowed: "Please allow microphone access to record",
+        not_found: "No microphone found",
+        no_media_support: "Your browser doesn't support audio recording",
+        unknown: "Could not start recording",
+      }
+      toast.error(msgs[err] ?? "Could not start recording")
+    }
+  }
+
+  async function handleStopRecording() {
+    const file = await recorder.stopRecording()
+    if (file) uploadFile(file)
+  }
+
+  function handleSuggestionClick(s: (typeof SUGGESTIONS)[number]) {
+    if (isTrialMode) { router.push("/login"); return }
+    if (s.action === "upload-pdf") pdfInputRef.current?.click()
+    else if (s.action === "upload") fileInputRef.current?.click()
+    else if (s.action === "record") handleStartRecording()
+  }
+
+  /* ── Shared recording overlay (used in both input bars) ── */
+  const recordingContent = (
+    <div className="flex w-full items-center gap-2 px-3">
+      <div className="relative flex-shrink-0">
+        <div className="h-2 w-2 rounded-full bg-red-500" />
+        <div className="absolute inset-0 animate-ping rounded-full bg-red-500/60" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <AudioWaveform analyser={recorder.analyserNode} />
+      </div>
+      <span className="flex-shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+        {formatElapsed(recorder.elapsed)}
+      </span>
+      <button type="button" onClick={recorder.cancelRecording}
+        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
+        aria-label="Cancel recording">
+        <X className="h-3.5 w-3.5" />
+      </button>
+      <button type="button" onClick={handleStopRecording}
+        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-red-500 text-white transition-colors hover:bg-red-600"
+        aria-label="Stop recording and send">
+        <Square className="h-3 w-3 fill-current" />
+      </button>
+    </div>
+  )
+
+  /* ── User message chips (active chat) ── */
+  function UserChip({ msg }: { msg: (typeof messages)[number] }) {
+    const isPdfAttachment = !!msg.attachment && (msg.attachment.type === "application/pdf" || msg.attachment.name.toLowerCase().endsWith(".pdf"))
+    const hasReview = isPdfAttachment && !!slideReview.reviews[msg.id]
+    const isActiveAnalysis = isPdfAttachment && slideReview.activeReviewKey === msg.id && slideReview.isAnalyzing
+    const isCurrentlyShown = slideReview.displayedKey === msg.id && slideReview.panelOpen
+
+    return (
+      <div className="flex flex-col gap-1.5">
+        {msg.attachment && (
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 rounded-full border border-border/40 bg-muted/50 px-3 py-1 text-xs text-muted-foreground/70">
+              {msg.attachment.type.startsWith("video") ? <FileVideo className="h-3 w-3 flex-shrink-0" />
+                : isPdfAttachment ? <FileText className="h-3 w-3 flex-shrink-0" />
+                : <FileAudio className="h-3 w-3 flex-shrink-0" />}
+              <span className="max-w-[200px] truncate">{msg.attachment.name}</span>
+              <span className="text-muted-foreground/40">·</span>
+              <span>{formatFileSize(msg.attachment.size)}</span>
+            </div>
+            {(hasReview || isActiveAnalysis) && !isCurrentlyShown && (
+              <button type="button"
+                onClick={() => slideReview.reviews[msg.id] ? slideReview.openReview(msg.id) : slideReview.openPanel()}
+                className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10">
+                {isActiveAnalysis ? "View progress" : "View review"}
+              </button>
+            )}
+          </div>
+        )}
+        {msg.content && (
+          <div className="flex items-center gap-2 rounded-full border border-border/40 bg-muted/50 px-3 py-1 text-xs text-muted-foreground/70">
+            <span className="text-muted-foreground/40">💬</span>
+            <span className="max-w-[300px] truncate">&ldquo;{msg.content}&rdquo;</span>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  /* ── Sub-label beneath face (active chat only) ── */
+  const currentPulse = pulseLabels[pulseIndex] ?? null
+  const audienceLabel = currentPulse
+    ?? researchMeta?.audienceSummary
+    ?? (slideReview.deckSummary?.audienceAssumed ? `Presenting to ${slideReview.deckSummary.audienceAssumed}` : null)
+    ?? "In the room with you"
+
+  const faceSubLabel = (isTranscribing || isResearching) ? (
+    <span className="animate-pulse text-xs text-muted-foreground/70">
+      {isTranscribing ? "Transcribing..." : "Thinking..."}
+    </span>
+  ) : (!isStreaming && !recorder.isRecording) ? (
+    <AnimatePresence mode="wait">
+      <motion.span
+        key={pulseLabels.length > 0 ? pulseIndex : audienceLabel}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.5 }}
+        className="max-w-[300px] text-center text-xs leading-snug text-muted-foreground/50"
+      >
+        {audienceLabel}
+      </motion.span>
+    </AnimatePresence>
+  ) : null
+
+  /* ── Render ── */
+  return (
+    <div className="relative flex flex-1 overflow-hidden bg-background">
+      <div
+        className="flex flex-1 flex-col overflow-hidden min-w-0"
+        style={{ marginRight: hasSlidePanel ? "62%" : 0, transition: "margin-right 0.45s cubic-bezier(0.16, 1, 0.3, 1)" }}
+      >
+        <AnimatePresence mode="wait">
+          {isEmptyState ? (
+
+            /* ════════════════════════════════════════════════
+               EMPTY STATE — original hero layout
+            ════════════════════════════════════════════════ */
+            <motion.div
+              key="empty-state"
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-6"
+            >
+              {/* Ambient glow */}
+              <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
+                <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full opacity-[0.08] blur-3xl">
+                  <div className="h-full w-full rounded-full" style={{ background: "radial-gradient(circle, hsl(36 56% 48% / 0.6), transparent 70%)" }} />
+                </div>
+                <div className="absolute -right-32 top-1/3 h-[400px] w-[400px] rounded-full opacity-[0.06] blur-3xl">
+                  <div className="h-full w-full rounded-full" style={{ background: "radial-gradient(circle, hsl(34 35% 74%), transparent 70%)" }} />
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center text-center">
+                <FadeIn delay={0}>
+                  <p className="font-display mb-2 text-xs font-semibold uppercase tracking-widest text-primary">Vera</p>
+                </FadeIn>
+                <FadeIn delay={0.1}>
+                  <h1 className="font-display text-4xl font-bold tracking-tight text-foreground md:text-5xl">
+                    Rehearse with
+                    <span className="mt-1 block text-primary">
+                      <span className="relative inline-block pb-3">
+                        <AnimatePresence mode="wait">
+                          <motion.span
+                            ref={audienceRefCallback}
+                            key={AUDIENCES[audienceIndex]}
+                            className="relative z-10 inline-block"
+                            style={{
+                              textShadow: ["-4px 0","4px 0","0 4px","0 -4px","-3px 3px","3px 3px","-3px -3px","3px -3px","-2px 4px","2px 4px","-4px 2px","4px 2px","-2px -4px","2px -4px","-4px -2px","4px -2px"]
+                                .map((o) => `${o} 0 hsl(var(--background))`).join(", "),
+                            }}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }}
+                            transition={{ duration: 0.25, ease: "easeInOut" }}
+                          >
+                            {AUDIENCES[audienceIndex]}
+                          </motion.span>
+                        </AnimatePresence>
+                        <motion.span
+                          className="absolute bottom-[0.18em] left-1/2 h-[3px] -translate-x-1/2 rounded-full bg-primary/30"
+                          animate={{ width: audienceWidth + 20 }}
+                          transition={{ duration: 0.35, ease: "easeInOut" }}
+                        />
+                      </span>
+                    </span>
+                  </h1>
+                </FadeIn>
+                <FadeIn delay={0.15}>
+                  <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground sm:text-base md:text-lg">
+                    Describe your audience and Vera will simulate them, giving you feedback that feels human.
+                  </p>
+                  {isTrialMode && (
+                    <p className="mt-2 text-xs text-primary sm:text-sm">Try 4 free messages — no account needed</p>
+                  )}
+                </FadeIn>
+
+                <FadeIn delay={0.25}>
+                  <form onSubmit={handleSubmit} className="mt-10 w-full max-w-3xl">
+                    <div className={`relative flex h-12 sm:h-14 items-center overflow-hidden rounded-2xl border bg-muted transition-colors ${
+                      recorder.isRecording ? "border-red-500/40" : "border-border focus-within:border-primary/30 focus-within:ring-1 focus-within:ring-primary/20"
+                    }`}>
+                      {recorder.isRecording ? recordingContent : (
+                        <>
+                          <button type="button" onClick={() => fileInputRef.current?.click()}
+                            disabled={isInputDisabled}
+                            className="absolute left-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                            aria-label="Attach a file">
+                            <Paperclip className="h-4 w-4" />
+                          </button>
+                          <textarea value={input} onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(e) } }}
+                            placeholder={inputPlaceholder} rows={1} disabled={isInputDisabled}
+                            className="h-full w-full resize-none bg-transparent py-3 pl-12 pr-20 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-50 sm:py-3.5 sm:text-base"
+                          />
+                          <button type="button" onClick={handleStartRecording}
+                            disabled={isBusy || trialLimitReached || slideReview.isAnalyzing || !!input.trim()}
+                            className="absolute right-11 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+                            aria-label="Start recording">
+                            <Mic className="h-4 w-4" />
+                          </button>
+                          <button type="submit" disabled={!input.trim() || isInputDisabled}
+                            className="absolute right-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
+                            aria-label="Send message">
+                            {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap justify-center gap-2 px-1">
+                      {SUGGESTIONS.map((s) => (
+                        <button key={s.label} type="button" onClick={() => handleSuggestionClick(s)}
+                          disabled={isInputDisabled}
+                          className="group flex items-center gap-1 rounded-full border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition-all duration-150 hover:border-primary/30 hover:text-foreground active:scale-[0.98] disabled:opacity-50 sm:px-3 sm:py-1.5 sm:text-xs">
+                          <s.icon className="h-3 w-3 flex-shrink-0 text-muted-foreground/60 transition-colors group-hover:text-primary" />
+                          <span className="whitespace-nowrap">{s.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </form>
+                </FadeIn>
+              </div>
+            </motion.div>
+
+          ) : (
+
+            /* ════════════════════════════════════════════════
+               ACTIVE CHAT — face + feed + toolbar
+            ════════════════════════════════════════════════ */
+            <motion.div
+              key="active-chat"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="flex flex-1 flex-col overflow-hidden"
+            >
+              {/* Face header */}
+              <div className="flex-shrink-0 flex flex-col items-center justify-center py-4 gap-2 border-b border-border/30">
+                <motion.div
+                  animate={{ width: faceSize, height: faceSize }}
+                  transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                  className="flex-shrink-0 flex items-center justify-center"
+                >
+                  <AudienceFace state={faceState} analyserNode={recorder.analyserNode} size={faceSize} />
+                </motion.div>
+                <div className="h-5 flex items-center justify-center">
+                  {faceSubLabel}
+                </div>
+              </div>
+
+              {/* Scrollable feed */}
+              <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+                <div className="mx-auto flex max-w-2xl flex-col gap-6">
+                  {messages.map((msg) => {
+                    if (msg.role === "assistant" && !msg.content) return null
+                    return (
+                      <div key={msg.id}>
+                        {msg.role === "assistant" ? (
+                          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+                            <div className="prose prose-sm max-w-none text-[0.9375rem] leading-[1.7] text-foreground/90 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:tracking-tight [&_h2]:text-base [&_h2]:font-semibold [&_h2]:tracking-tight [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:uppercase [&_h3]:tracking-wide [&_h3]:text-foreground/70 [&_strong]:text-foreground [&_blockquote]:border-primary/20 [&_blockquote]:text-foreground/70 [&_li]:marker:text-primary/40">
+                              <ReactMarkdown>{msg.content}</ReactMarkdown>
+                            </div>
+                          </motion.div>
+                        ) : (
+                          <UserChip msg={msg} />
+                        )}
+                      </div>
+                    )
+                  })}
+
+                  {isCompressing && (
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <span className="text-sm text-muted-foreground">Compressing audio</span>
+                    </div>
+                  )}
+                  {isTranscribing && !isCompressing && (
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <span className="text-sm text-muted-foreground">Transcribing your recording</span>
+                    </div>
+                  )}
+                  {isResearching && (
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <span className="text-sm text-muted-foreground">Researching your audience</span>
+                    </div>
+                  )}
+                  {researchMeta && !isResearching && <ResearchCard meta={researchMeta} />}
+                  {isStreaming && messages.length > 0 && messages[messages.length - 1].role === "assistant" && messages[messages.length - 1].content === "" && (
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <span className="text-sm text-muted-foreground">Analyzing your presentation</span>
+                    </div>
+                  )}
+
+                  {showFollowUps && (
+                    <div className="pt-2">
+                      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground/70">Continue with</p>
+                      <div className="flex flex-wrap gap-2">
+                        {followUps.map((f) => (
+                          <button key={f.label} type="button"
+                            onClick={() => { setInput(""); sendMessage(f.message) }}
+                            disabled={isInputDisabled}
+                            className="group flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-sm text-foreground/80 transition-all hover:border-primary/30 hover:bg-accent hover:text-foreground active:scale-[0.98] disabled:opacity-50">
+                            {f.label}
+                            <ArrowRight className="h-3 w-3 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-primary" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Bottom input bar */}
+              <div className="flex-shrink-0 px-4 pb-4 pt-2 sm:px-6">
+                <form onSubmit={handleSubmit} className="mx-auto max-w-2xl">
+                  <div className={`relative flex h-12 sm:h-14 items-center overflow-hidden rounded-2xl border bg-muted transition-colors ${
+                    recorder.isRecording ? "border-red-500/40" : "border-border focus-within:border-primary/30 focus-within:ring-1 focus-within:ring-primary/20"
+                  }`}>
+                    {recorder.isRecording ? recordingContent : (
+                      <>
+                        <button type="button" onClick={() => fileInputRef.current?.click()}
+                          disabled={isBusy || trialLimitReached || slideReview.isAnalyzing}
+                          className="absolute left-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                          aria-label="Attach a file">
+                          <Paperclip className="h-4 w-4" />
+                        </button>
+                        <textarea value={input} onChange={(e) => setInput(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(e) } }}
+                          placeholder="Describe your audience or ask for feedback..."
+                          rows={1} disabled={isInputDisabled}
+                          className="h-full w-full resize-none bg-transparent py-3 pl-12 pr-20 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-50 sm:py-3.5"
+                        />
+                        <button type="button" onClick={handleStartRecording}
+                          disabled={isBusy || trialLimitReached || slideReview.isAnalyzing || !!input.trim()}
+                          className="absolute right-11 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+                          aria-label="Start recording">
+                          <Mic className="h-4 w-4" />
+                        </button>
+                        <button type="submit" disabled={!input.trim() || isInputDisabled}
+                          className="absolute right-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
+                          aria-label="Send message">
+                          {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Slide panel */}
+      <AnimatePresence>
+        {hasSlidePanel && (
+          <motion.div key="slide-panel"
+            className="absolute inset-y-0 right-0 flex w-full flex-col overflow-hidden border-l border-border/60 bg-background md:w-[62%]"
+            initial={{ x: "100%", opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: "100%", opacity: 0 }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}>
+            <SlidePanel slideReview={slideReview} onClose={slideReview.closePanel} onReset={slideReview.reset} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Hidden file inputs */}
+      <input ref={fileInputRef} type="file" accept="video/*,audio/*,.pdf,application/pdf" onChange={handleFileUpload} className="hidden" aria-label="Upload video, audio, or PDF" />
+      <input ref={pdfInputRef} type="file" accept=".pdf,application/pdf" onChange={handlePdfUpload} className="hidden" aria-label="Upload PDF slides" />
+
+      {/* Trial limit dialog */}
+      <Dialog open={showTrialDialog} onOpenChange={setShowTrialDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>You&apos;ve used your free messages</DialogTitle>
+            <DialogDescription>Create a free account to keep coaching with Vera.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row">
+            <a href="/login" className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+              Sign in
+            </a>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}

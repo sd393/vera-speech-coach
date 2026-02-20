@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { LandingNavbar } from "@/components/landing-navbar"
-import { ChatInterface } from "@/components/chat-interface"
+import { CoachingInterface } from "@/components/coaching-interface"
 import { About } from "@/components/about"
 import { HowItWorks } from "@/components/how-it-works"
 import { Stats } from "@/components/stats"
@@ -49,7 +49,7 @@ export default function Page() {
     <>
       <LandingNavbar />
       <section className="flex h-dvh flex-col pt-[70px]">
-        <ChatInterface
+        <CoachingInterface
           authToken={isTrialMode ? null : idToken}
           isTrialMode={isTrialMode}
           onChatStart={handleChatStart}
