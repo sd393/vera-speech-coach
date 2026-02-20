@@ -294,16 +294,38 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
     return () => clearInterval(t)
   }, [pulseLabels])
 
+  /* ── Held processing state (prevents gap flash between phases) ── */
+  const isProcessingRaw = isCompressing || isTranscribing || isResearching || isTTSLoading || (presentationMode && isStreaming)
+  const [isProcessingHeld, setIsProcessingHeld] = useState(false)
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  useEffect(() => {
+    if (isProcessingRaw) {
+      clearTimeout(holdTimerRef.current)
+      setIsProcessingHeld(true)
+    } else {
+      holdTimerRef.current = setTimeout(() => setIsProcessingHeld(false), 500)
+    }
+    return () => clearTimeout(holdTimerRef.current)
+  }, [isProcessingRaw])
+
   /* ── Derived state ── */
   const isBusy = isCompressing || isTranscribing || isResearching || isStreaming
   const isInputDisabled = isBusy || trialLimitReached || slideReview.isAnalyzing || recorder.isRecording
   const isEmptyState = messages.length === 1 && messages[0].role === "assistant"
 
   const faceState: FaceState = recorder.isRecording ? "listening"
-    : (isTranscribing || isResearching || isTTSLoading || (presentationMode && isStreaming)) ? "thinking"
+    : isProcessingHeld ? "thinking"
     : ((!presentationMode && isStreaming) || isTTSSpeaking) ? "speaking"
     : satisfiedWindow ? "satisfied"
     : "idle"
+
+  const thinkingLabel = isCompressing ? "Compressing audio..."
+    : isTranscribing ? "Transcribing..."
+    : isResearching ? "Researching your audience..."
+    : (presentationMode && isStreaming) ? "Analyzing your presentation..."
+    : isTTSLoading ? "Preparing response..."
+    : "Thinking..."
 
   const exchangeCount = messages.filter((m) => m.role === "user").length
   const lastMessage = messages[messages.length - 1]
@@ -348,43 +370,14 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
     return () => { ttsAudioRef.current?.pause(); ttsAudioRef.current = null }
   }, [])
 
-  /* ── TTS functions (ElevenLabs) ── */
+  /* ── TTS functions (ElevenLabs with forced alignment) ── */
 
-  const ttsSentencesRef = useRef<{ text: string; startFrac: number; endFrac: number }[]>([])
-
-  /** Strip markdown to plain text (mirrors server-side cleaning) */
-  function stripMarkdown(text: string): string {
-    return text
-      .replace(/#{1,6} /g, "")
-      .replace(/\*\*(.*?)\*\*/g, "$1")
-      .replace(/\*(.*?)\*/g, "$1")
-      .replace(/`[^`]+`/g, "")
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-      .replace(/^[-*+] /gm, "")
-      .replace(/^\d+\. /gm, "")
-      .replace(/---+/g, "")
-      .replace(/\n{2,}/g, " ")
-      .trim()
-  }
+  const ttsSentencesRef = useRef<{ text: string; start: number; end: number }[]>([])
 
   function speakText(text: string) {
     stopSpeaking()
     setIsTTSLoading(true)
 
-    // Build sentence timeline for captions (word-count proportions)
-    const cleaned = stripMarkdown(text)
-    const sentences = cleaned.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 3)
-    const wordCount = (s: string) => s.split(/\s+/).length
-    const totalWords = sentences.reduce((sum, s) => sum + wordCount(s), 0)
-    let cumulative = 0
-    ttsSentencesRef.current = sentences.map(s => {
-      const start = cumulative / totalWords
-      cumulative += wordCount(s)
-      return { text: s, startFrac: start, endFrac: cumulative / totalWords }
-    })
-    if (sentences.length > 0) setTtsCaption(sentences[0])
-
-    // Fetch full audio then play
     fetch("/api/tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -392,25 +385,30 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
     })
       .then(res => {
         if (!res.ok) throw new Error(`TTS failed: ${res.status}`)
-        return res.blob()
+        return res.json()
       })
-      .then(blob => {
-        const url = URL.createObjectURL(blob)
-        const audio = new Audio(url)
-        ttsAudioRef.current = audio
+      .then(({ audio, sentences }: { audio: string; sentences: { text: string; start: number; end: number }[] }) => {
+        ttsSentencesRef.current = sentences
+        if (sentences.length > 0) setTtsCaption(sentences[0].text)
 
-        audio.onplaying = () => {
+        // Decode base64 audio → blob → Audio element
+        const bytes = Uint8Array.from(atob(audio), c => c.charCodeAt(0))
+        const blob = new Blob([bytes], { type: "audio/mpeg" })
+        const url = URL.createObjectURL(blob)
+        const audioEl = new Audio(url)
+        ttsAudioRef.current = audioEl
+
+        audioEl.onplaying = () => {
           setIsTTSLoading(false)
           setIsTTSSpeaking(true)
         }
-        audio.ontimeupdate = () => {
-          if (!audio.duration || !isFinite(audio.duration)) return
-          // Lead captions by 0.5s so text appears slightly before speech
-          const frac = Math.min(1, (audio.currentTime + 0.5) / audio.duration)
-          const hit = ttsSentencesRef.current.find(s => frac >= s.startFrac && frac < s.endFrac)
+        audioEl.ontimeupdate = () => {
+          // Show caption 0.3s ahead of speech
+          const t = audioEl.currentTime + 0.3
+          const hit = ttsSentencesRef.current.find(s => t >= s.start && t < s.end)
           if (hit) setTtsCaption(hit.text)
         }
-        audio.onended = () => {
+        audioEl.onended = () => {
           URL.revokeObjectURL(url)
           setIsTTSSpeaking(false)
           setTtsCaption("")
@@ -420,7 +418,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
             setTimeout(() => setSatisfiedWindow(false), 3000)
           }
         }
-        audio.onerror = () => {
+        audioEl.onerror = () => {
           URL.revokeObjectURL(url)
           setIsTTSLoading(false)
           setIsTTSSpeaking(false)
@@ -428,7 +426,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
           ttsAudioRef.current = null
         }
 
-        audio.play().catch(() => {
+        audioEl.play().catch(() => {
           setIsTTSLoading(false)
           setIsTTSSpeaking(false)
           setTtsCaption("")
@@ -895,7 +893,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
                   >
                     {ttsCaption}
                   </motion.p>
-                ) : (isTranscribing || isResearching || isTTSLoading) ? (
+                ) : faceState === "thinking" ? (
                   <motion.span
                     key="thinking-label"
                     initial={{ opacity: 0 }}
@@ -903,11 +901,11 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
                     exit={{ opacity: 0 }}
                     className="animate-pulse text-xs text-muted-foreground/70"
                   >
-                    {isTranscribing ? "Transcribing..." : isTTSLoading ? "Preparing response..." : "Thinking..."}
+                    {thinkingLabel}
                   </motion.span>
                 ) : (
                   <motion.span
-                    key={pulseLabels.length > 0 ? pulseIndex : audienceLabel}
+                    key={audienceLabel}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
