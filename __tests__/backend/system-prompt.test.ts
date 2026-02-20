@@ -11,7 +11,7 @@ describe('buildSystemPrompt', () => {
 
   it('returns welcome/upload prompt when transcript is undefined', () => {
     const prompt = buildSystemPrompt(undefined)
-    expect(prompt).toContain('not yet uploaded')
+    expect(prompt).toContain('not yet shared any presentation content')
   })
 
   it('returns audience discovery and feedback prompt when transcript provided', () => {
@@ -67,7 +67,7 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('SLIDE DECK ANALYSIS')
     expect(prompt).toContain(slideCtx)
     expect(prompt).not.toContain('TRANSCRIPT:')
-    expect(prompt).not.toContain('not yet uploaded')
+    expect(prompt).not.toContain('not yet shared any presentation content')
   })
 
   it('prefers transcript phase over slide deck phase when both provided', () => {
@@ -78,6 +78,6 @@ describe('buildSystemPrompt', () => {
 
   it('falls back to welcome phase when neither transcript nor slideContext provided', () => {
     const prompt = buildSystemPrompt(undefined, undefined, undefined)
-    expect(prompt).toContain('not yet uploaded')
+    expect(prompt).toContain('not yet shared any presentation content')
   })
 })

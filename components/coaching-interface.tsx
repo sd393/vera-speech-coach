@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Search,
   ChevronDown,
+  Play,
 } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 import { toast } from "sonner"
@@ -163,7 +164,7 @@ const AUDIENCES = [
 
 const SUGGESTIONS = [
   { icon: FileText, label: "Review my slide deck", action: "upload-pdf" as const },
-  { icon: Mic,      label: "Listen to my live presentation", action: "record" as const },
+  { icon: Play,     label: "Listen to my live presentation", action: "present" as const },
   { icon: Upload,   label: "Upload a video or audio recording", action: "upload" as const },
 ]
 
@@ -202,6 +203,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
   const [input, setInput] = useState("")
   const [inputPlaceholder, setInputPlaceholder] = useState("Describe your audience or ask for feedback...")
   const [showTrialDialog, setShowTrialDialog] = useState(false)
+  const [presentationMode, setPresentationMode] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pdfInputRef = useRef<HTMLInputElement>(null)
@@ -233,11 +235,24 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
   const [pulseIndex, setPulseIndex] = useState(0)
   const prevStreaming = useRef(false)
 
+  /* ── TTS (ElevenLabs) ── */
+  const [isTTSLoading, setIsTTSLoading] = useState(false)
+  const [isTTSSpeaking, setIsTTSSpeaking] = useState(false)
+  const [ttsCaption, setTtsCaption] = useState("")
+  const ttsAudioRef = useRef<HTMLAudioElement | null>(null)
+  const presentationModeRef = useRef(false)
+  useEffect(() => { presentationModeRef.current = presentationMode }, [presentationMode])
+
   useEffect(() => {
     if (prevStreaming.current && !isStreaming) {
-      setSatisfiedWindow(true)
-      const t = setTimeout(() => setSatisfiedWindow(false), 2000)
       prevStreaming.current = false
+
+      // In presentation mode, TTS drives the satisfied state; otherwise flash immediately
+      let t: ReturnType<typeof setTimeout> | undefined
+      if (!presentationModeRef.current) {
+        setSatisfiedWindow(true)
+        t = setTimeout(() => setSatisfiedWindow(false), 2000)
+      }
 
       const recent = messages
         .filter(m => m.content.trim())
@@ -262,7 +277,12 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
           .catch(() => {})
       }
 
-      return () => clearTimeout(t)
+      if (presentationModeRef.current) {
+        const lastAssistant = [...messages].reverse().find(m => m.role === "assistant" && m.content)
+        if (lastAssistant?.content) speakText(lastAssistant.content)
+      }
+
+      return () => { if (t) clearTimeout(t) }
     }
     prevStreaming.current = isStreaming
   }, [isStreaming, messages])
@@ -280,8 +300,8 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
   const isEmptyState = messages.length === 1 && messages[0].role === "assistant"
 
   const faceState: FaceState = recorder.isRecording ? "listening"
-    : (isTranscribing || isResearching) ? "thinking"
-    : isStreaming ? "speaking"
+    : (isTranscribing || isResearching || isTTSLoading || (presentationMode && isStreaming)) ? "thinking"
+    : ((!presentationMode && isStreaming) || isTTSSpeaking) ? "speaking"
     : satisfiedWindow ? "satisfied"
     : "idle"
 
@@ -289,7 +309,6 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
   const lastMessage = messages[messages.length - 1]
   const showFollowUps = !isBusy && !isEmptyState && lastMessage?.role === "assistant" && lastMessage.content.length > 0
   const followUps = exchangeCount <= 1 ? FOLLOW_UPS_EARLY : FOLLOW_UPS_LATER
-  const faceSize = hasSlidePanel ? 140 : 200
 
   /* ── Effects ── */
   useEffect(() => { if (!isEmptyState) onChatStart?.() }, [isEmptyState, onChatStart])
@@ -311,6 +330,128 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
       setSlideContext(formatSlideContextForChat(slideReview.deckSummary, slideReview.slideFeedbacks))
     }
   }, [slideReview.deckSummary, slideReview.slideFeedbacks, setSlideContext])
+
+  useEffect(() => {
+    if (hasSlidePanel && presentationMode) setPresentationMode(false)
+  }, [hasSlidePanel, presentationMode])
+
+  useEffect(() => {
+    if (!presentationMode) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") { setPresentationMode(false); stopSpeaking() }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [presentationMode])
+
+  useEffect(() => {
+    return () => { ttsAudioRef.current?.pause(); ttsAudioRef.current = null }
+  }, [])
+
+  /* ── TTS functions (ElevenLabs) ── */
+
+  const ttsSentencesRef = useRef<{ text: string; startFrac: number; endFrac: number }[]>([])
+
+  /** Strip markdown to plain text (mirrors server-side cleaning) */
+  function stripMarkdown(text: string): string {
+    return text
+      .replace(/#{1,6} /g, "")
+      .replace(/\*\*(.*?)\*\*/g, "$1")
+      .replace(/\*(.*?)\*/g, "$1")
+      .replace(/`[^`]+`/g, "")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/^[-*+] /gm, "")
+      .replace(/^\d+\. /gm, "")
+      .replace(/---+/g, "")
+      .replace(/\n{2,}/g, " ")
+      .trim()
+  }
+
+  function speakText(text: string) {
+    stopSpeaking()
+    setIsTTSLoading(true)
+
+    // Build sentence timeline for captions (word-count proportions)
+    const cleaned = stripMarkdown(text)
+    const sentences = cleaned.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 3)
+    const wordCount = (s: string) => s.split(/\s+/).length
+    const totalWords = sentences.reduce((sum, s) => sum + wordCount(s), 0)
+    let cumulative = 0
+    ttsSentencesRef.current = sentences.map(s => {
+      const start = cumulative / totalWords
+      cumulative += wordCount(s)
+      return { text: s, startFrac: start, endFrac: cumulative / totalWords }
+    })
+    if (sentences.length > 0) setTtsCaption(sentences[0])
+
+    // Fetch full audio then play
+    fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    })
+      .then(res => {
+        if (!res.ok) throw new Error(`TTS failed: ${res.status}`)
+        return res.blob()
+      })
+      .then(blob => {
+        const url = URL.createObjectURL(blob)
+        const audio = new Audio(url)
+        ttsAudioRef.current = audio
+
+        audio.onplaying = () => {
+          setIsTTSLoading(false)
+          setIsTTSSpeaking(true)
+        }
+        audio.ontimeupdate = () => {
+          if (!audio.duration || !isFinite(audio.duration)) return
+          // Lead captions by 0.5s so text appears slightly before speech
+          const frac = Math.min(1, (audio.currentTime + 0.5) / audio.duration)
+          const hit = ttsSentencesRef.current.find(s => frac >= s.startFrac && frac < s.endFrac)
+          if (hit) setTtsCaption(hit.text)
+        }
+        audio.onended = () => {
+          URL.revokeObjectURL(url)
+          setIsTTSSpeaking(false)
+          setTtsCaption("")
+          ttsAudioRef.current = null
+          if (presentationModeRef.current) {
+            setSatisfiedWindow(true)
+            setTimeout(() => setSatisfiedWindow(false), 3000)
+          }
+        }
+        audio.onerror = () => {
+          URL.revokeObjectURL(url)
+          setIsTTSLoading(false)
+          setIsTTSSpeaking(false)
+          setTtsCaption("")
+          ttsAudioRef.current = null
+        }
+
+        audio.play().catch(() => {
+          setIsTTSLoading(false)
+          setIsTTSSpeaking(false)
+          setTtsCaption("")
+          URL.revokeObjectURL(url)
+          ttsAudioRef.current = null
+        })
+      })
+      .catch(() => {
+        setIsTTSLoading(false)
+        setTtsCaption("")
+      })
+  }
+
+  function stopSpeaking() {
+    if (ttsAudioRef.current) {
+      ttsAudioRef.current.pause()
+      ttsAudioRef.current = null
+    }
+    setIsTTSLoading(false)
+    setIsTTSSpeaking(false)
+    setTtsCaption("")
+    ttsSentencesRef.current = []
+  }
 
   /* ── Handlers ── */
   function handleSubmit(e: FormEvent) {
@@ -362,10 +503,10 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
   }
 
   function handleSuggestionClick(s: (typeof SUGGESTIONS)[number]) {
+    if (s.action === "present") { setPresentationMode(true); return }
     if (isTrialMode) { router.push("/login"); return }
     if (s.action === "upload-pdf") pdfInputRef.current?.click()
     else if (s.action === "upload") fileInputRef.current?.click()
-    else if (s.action === "record") handleStartRecording()
   }
 
   /* ── Shared recording overlay (used in both input bars) ── */
@@ -394,40 +535,40 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
     </div>
   )
 
-  /* ── User message chips (active chat) ── */
-  function UserChip({ msg }: { msg: (typeof messages)[number] }) {
+  /* ── User message bubble (active chat) ── */
+  function UserBubble({ msg }: { msg: (typeof messages)[number] }) {
     const isPdfAttachment = !!msg.attachment && (msg.attachment.type === "application/pdf" || msg.attachment.name.toLowerCase().endsWith(".pdf"))
     const hasReview = isPdfAttachment && !!slideReview.reviews[msg.id]
     const isActiveAnalysis = isPdfAttachment && slideReview.activeReviewKey === msg.id && slideReview.isAnalyzing
     const isCurrentlyShown = slideReview.displayedKey === msg.id && slideReview.panelOpen
 
     return (
-      <div className="flex flex-col gap-1.5">
-        {msg.attachment && (
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 rounded-full border border-border/40 bg-muted/50 px-3 py-1 text-xs text-muted-foreground/70">
-              {msg.attachment.type.startsWith("video") ? <FileVideo className="h-3 w-3 flex-shrink-0" />
-                : isPdfAttachment ? <FileText className="h-3 w-3 flex-shrink-0" />
-                : <FileAudio className="h-3 w-3 flex-shrink-0" />}
-              <span className="max-w-[200px] truncate">{msg.attachment.name}</span>
-              <span className="text-muted-foreground/40">·</span>
-              <span>{formatFileSize(msg.attachment.size)}</span>
+      <div className="flex justify-end">
+        <div className="max-w-[80%]">
+          {msg.attachment && (
+            <div className="mb-2 flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2">
+              {msg.attachment.type.startsWith("video") ? <FileVideo className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                : isPdfAttachment ? <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                : <FileAudio className="h-4 w-4 flex-shrink-0 text-muted-foreground" />}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">{msg.attachment.name}</p>
+                <p className="text-xs text-muted-foreground">{formatFileSize(msg.attachment.size)}</p>
+              </div>
+              {(hasReview || isActiveAnalysis) && !isCurrentlyShown && (
+                <button type="button"
+                  onClick={() => slideReview.reviews[msg.id] ? slideReview.openReview(msg.id) : slideReview.openPanel()}
+                  className="ml-1 flex-shrink-0 rounded bg-primary/10 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/20">
+                  {isActiveAnalysis ? "View progress" : "View review"}
+                </button>
+              )}
             </div>
-            {(hasReview || isActiveAnalysis) && !isCurrentlyShown && (
-              <button type="button"
-                onClick={() => slideReview.reviews[msg.id] ? slideReview.openReview(msg.id) : slideReview.openPanel()}
-                className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10">
-                {isActiveAnalysis ? "View progress" : "View review"}
-              </button>
-            )}
-          </div>
-        )}
-        {msg.content && (
-          <div className="flex items-center gap-2 rounded-full border border-border/40 bg-muted/50 px-3 py-1 text-xs text-muted-foreground/70">
-            <span className="text-muted-foreground/40">💬</span>
-            <span className="max-w-[300px] truncate">&ldquo;{msg.content}&rdquo;</span>
-          </div>
-        )}
+          )}
+          {msg.content && (
+            <div className="rounded-xl bg-muted px-4 py-2.5">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{msg.content}</p>
+            </div>
+          )}
+        </div>
       </div>
     )
   }
@@ -575,6 +716,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
                         </button>
                       ))}
                     </div>
+
                   </form>
                 </FadeIn>
               </div>
@@ -592,20 +734,6 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
               transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
               className="flex flex-1 flex-col overflow-hidden"
             >
-              {/* Face header */}
-              <div className="flex-shrink-0 flex flex-col items-center justify-center py-4 gap-2 border-b border-border/30">
-                <motion.div
-                  animate={{ width: faceSize, height: faceSize }}
-                  transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-                  className="flex-shrink-0 flex items-center justify-center"
-                >
-                  <AudienceFace state={faceState} analyserNode={recorder.analyserNode} size={faceSize} />
-                </motion.div>
-                <div className="h-5 flex items-center justify-center">
-                  {faceSubLabel}
-                </div>
-              </div>
-
               {/* Scrollable feed */}
               <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
                 <div className="mx-auto flex max-w-2xl flex-col gap-6">
@@ -620,7 +748,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
                             </div>
                           </motion.div>
                         ) : (
-                          <UserChip msg={msg} />
+                          <UserBubble msg={msg} />
                         )}
                       </div>
                     )
@@ -671,6 +799,22 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
                 </div>
               </div>
 
+              {/* Present mode trigger */}
+              <div className="flex-shrink-0 px-4 sm:px-6 pb-2">
+                <div className="mx-auto max-w-2xl">
+                  <button
+                    type="button"
+                    onClick={() => setPresentationMode(true)}
+                    disabled={isBusy || trialLimitReached}
+                    className="flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-40"
+                    aria-label="Enter presentation mode"
+                  >
+                    <Play className="h-3.5 w-3.5 fill-current" />
+                    Present mode
+                  </button>
+                </div>
+              </div>
+
               {/* Bottom input bar */}
               <div className="flex-shrink-0 px-4 pb-4 pt-2 sm:px-6">
                 <form onSubmit={handleSubmit} className="mx-auto max-w-2xl">
@@ -707,10 +851,123 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
                   </div>
                 </form>
               </div>
+
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+
+      {/* Presentation overlay */}
+      <AnimatePresence>
+        {presentationMode && (
+          <motion.div
+            key="presentation-overlay"
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {/* Exit button */}
+            <button
+              type="button"
+              onClick={() => { setPresentationMode(false); stopSpeaking() }}
+              className="absolute top-4 right-4 flex items-center gap-2 rounded-full border border-border bg-muted/60 px-4 py-2 text-sm font-medium text-foreground backdrop-blur-sm transition-colors hover:bg-muted hover:border-border/80"
+            >
+              <X className="h-3.5 w-3.5" />
+              Exit
+            </button>
+
+            {/* Face */}
+            <AudienceFace state={faceState} analyserNode={recorder.analyserNode} size={280} />
+
+            {/* Caption area — audience thoughts when idle, current sentence when speaking */}
+            <div className="mt-4 flex h-12 items-center justify-center px-6">
+              <AnimatePresence mode="wait">
+                {isTTSSpeaking && ttsCaption ? (
+                  <motion.p
+                    key={ttsCaption}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.3 }}
+                    className="max-w-lg text-center text-sm leading-relaxed text-muted-foreground"
+                  >
+                    {ttsCaption}
+                  </motion.p>
+                ) : (isTranscribing || isResearching || isTTSLoading) ? (
+                  <motion.span
+                    key="thinking-label"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="animate-pulse text-xs text-muted-foreground/70"
+                  >
+                    {isTranscribing ? "Transcribing..." : isTTSLoading ? "Preparing response..." : "Thinking..."}
+                  </motion.span>
+                ) : (
+                  <motion.span
+                    key={pulseLabels.length > 0 ? pulseIndex : audienceLabel}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="max-w-[300px] text-center text-xs leading-snug text-muted-foreground/50"
+                  >
+                    {audienceLabel}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Record controls */}
+            <div className="mt-8 flex items-center justify-center">
+              {(faceState === "idle" || faceState === "satisfied") && (
+                <button
+                  type="button"
+                  onClick={() => { setSatisfiedWindow(false); handleStartRecording() }}
+                  className="flex items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-5 py-2.5 text-sm text-muted-foreground hover:border-primary/30 hover:text-foreground transition-colors"
+                >
+                  <span className="h-2 w-2 rounded-full bg-red-500" />
+                  Continue
+                </button>
+              )}
+
+              {recorder.isRecording && (
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-shrink-0">
+                    <div className="h-2 w-2 rounded-full bg-red-500" />
+                    <div className="absolute inset-0 animate-ping rounded-full bg-red-500/60" />
+                  </div>
+                  <div className="w-40">
+                    <AudioWaveform analyser={recorder.analyserNode} />
+                  </div>
+                  <span className="flex-shrink-0 font-mono text-sm tabular-nums text-muted-foreground">
+                    {formatElapsed(recorder.elapsed)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={recorder.cancelRecording}
+                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
+                    aria-label="Cancel recording"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleStopRecording}
+                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-red-500 text-white transition-colors hover:bg-red-600"
+                    aria-label="Stop recording and send"
+                  >
+                    <Square className="h-3.5 w-3.5 fill-current" />
+                  </button>
+                </div>
+              )}
+
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Slide panel */}
       <AnimatePresence>
