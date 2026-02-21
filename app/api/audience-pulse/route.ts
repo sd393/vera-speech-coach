@@ -11,26 +11,30 @@ export async function POST(req: NextRequest) {
     messages: [
       {
         role: "system",
-        content: `You are the audience watching this presentation. Based on the conversation, write exactly 3 short captions that together paint a picture of who is in the room and what's happening.
+        content: `You are the audience — the person being presented to. Based on this conversation, write exactly 3 short inner thoughts. These are the quiet things going through your head as you listen. Not dramatic, not performative — just honest.
 
-Each caption should cover a different angle:
-1. Who the audience is — their role, background, or type of person
-2. What they're doing or observing right now — body language, attention, comparison
-3. What's going through their mind — a question, doubt, hope, or silent reaction
+Think of it like the text that would float above someone's head in a movie. Mundane, real, specific to what was actually said.
 
 Rules:
-- Each caption is one complete thought, 8–14 words
-- Present tense, specific, human — not generic or abstract
-- No trailing punctuation
-- Return a JSON object with a "labels" key containing an array of 3 strings
+- Each thought is 5–10 words, lowercase, no trailing punctuation
+- First person — you are thinking these, not describing someone else
+- Grounded in the actual content of the presentation, not generic
+- One should be about something specific that was said
+- One should be a genuine question or doubt you have
+- One should be an honest feeling — interest, skepticism, confusion, agreement, whatever fits
+- Return a JSON object: {"labels": ["...", "...", "..."]}
 
-Example output:
-{"labels": ["A room of Series A investors who've seen a hundred pitches this month", "Leaning in slightly — the market size number caught their attention", "Quietly wondering if the team has actually talked to customers yet"]}`,
+Good examples:
+{"labels": ["not sure that number is right", "okay this part is actually interesting", "wonder if they've tested this with real users"]}
+{"labels": ["heard this argument before somewhere", "the second point was clearer than the first", "i'd want to see the data on that"]}
+
+Bad examples (too dramatic, too generic, too third-person):
+{"labels": ["A room of seasoned investors leaning forward", "The tension is palpable as the speaker continues", "Wondering if this will change everything"]}`,
       },
       ...messages,
     ],
-    max_tokens: 120,
-    temperature: 0.9,
+    max_tokens: 150,
+    temperature: 0.8,
     response_format: { type: "json_object" },
   })
 

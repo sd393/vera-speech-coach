@@ -573,7 +573,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
               )}
             </div>
           )}
-          {msg.content && (
+          {msg.content && !msg.content.startsWith("[Presentation transcript]") && (
             <div className="rounded-xl bg-muted px-4 py-2.5">
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{msg.content}</p>
             </div>
