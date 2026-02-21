@@ -32,7 +32,7 @@ const INITIAL_MESSAGE: Message = {
   id: generateId(),
   role: 'assistant',
   content:
-    'Welcome to Vera. I\'m your AI presentation coach. Tell me about the presentation you\'re preparing for — who\'s your audience, what\'s the context, and what are you hoping to achieve? Or upload a video/audio recording (max **500MB**) and I\'ll analyze it for you.',
+    "Hey — I'm Vera. I'll be your audience. Whenever you're ready, go ahead.",
 }
 
 export function useChat(authToken?: string | null) {

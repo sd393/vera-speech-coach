@@ -17,7 +17,6 @@ import {
   ArrowRight,
   Search,
   ChevronDown,
-  Play,
   Smile,
 } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
@@ -158,16 +157,14 @@ function ResearchCard({ meta }: { meta: ResearchMeta }) {
 
 /* ── Constants ── */
 
-const AUDIENCES = [
-  "investors", "your class", "customers", "your team", "a jury",
-  "prospects", "colleagues", "reviewers", "patients", "delegates",
+const SETUP_EXAMPLES = [
+  { topic: "my Series A pitch", audience: "VC investors", goal: "secure funding" },
+  { topic: "a Q3 revenue review", audience: "the board of directors", goal: "get buy-in" },
+  { topic: "our product roadmap", audience: "my engineering team", goal: "ship on time" },
+  { topic: "a keynote talk", audience: "500 conference attendees", goal: "inspire action" },
+  { topic: "a client proposal", audience: "the procurement team", goal: "close the deal" },
 ]
 
-const SUGGESTIONS = [
-  { icon: FileText, label: "Review my slide deck", action: "upload-pdf" as const },
-  { icon: Play,     label: "Listen to my live presentation", action: "present" as const },
-  { icon: Upload,   label: "Upload a video or audio recording", action: "upload" as const },
-]
 
 const FOLLOW_UPS_EARLY = [
   { label: "Define my target audience", message: "Help me clearly define who I'm presenting to — their role, expectations, and what they care about." },
@@ -203,6 +200,9 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
 
   const [input, setInput] = useState("")
   const [inputPlaceholder, setInputPlaceholder] = useState("Describe your audience or ask for feedback...")
+  const [setupTopic, setSetupTopic] = useState("")
+  const [setupAudience, setSetupAudience] = useState("")
+  const [setupGoal, setSetupGoal] = useState("")
   const [showTrialDialog, setShowTrialDialog] = useState(false)
   const [presentationMode, setPresentationMode] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -218,17 +218,34 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
     return () => mq.removeEventListener("change", update)
   }, [])
 
-  /* ── Audience animation ── */
-  const [audienceIndex, setAudienceIndex] = useState(0)
-  const [audienceWidth, setAudienceWidth] = useState(0)
-  const audienceRefCallback = React.useCallback((node: HTMLSpanElement | null) => {
-    if (node) setAudienceWidth(node.offsetWidth)
+  /* ── Setup example cycling + underline measurement ── */
+  const [exampleIndex, setExampleIndex] = useState(0)
+  // sizerIndex lags behind exampleIndex by the exit animation duration,
+  // so the container doesn't resize until the old text has faded out.
+  const [sizerIndex, setSizerIndex] = useState(0)
+
+  useEffect(() => {
+    const interval = setInterval(() => setExampleIndex((i) => (i + 1) % SETUP_EXAMPLES.length), 3000)
+    return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
-    const interval = setInterval(() => setAudienceIndex((prev) => (prev + 1) % AUDIENCES.length), 2000)
-    return () => clearInterval(interval)
-  }, [])
+    const t = setTimeout(() => setSizerIndex(exampleIndex), 250)
+    return () => clearTimeout(t)
+  }, [exampleIndex])
+
+  const topicSizerRef = useRef<HTMLSpanElement>(null)
+  const audienceSizerRef = useRef<HTMLSpanElement>(null)
+  const goalSizerRef = useRef<HTMLSpanElement>(null)
+  const [blankWidths, setBlankWidths] = useState({ topic: 0, audience: 0, goal: 0 })
+
+  useEffect(() => {
+    setBlankWidths({
+      topic: topicSizerRef.current?.offsetWidth ?? 0,
+      audience: audienceSizerRef.current?.offsetWidth ?? 0,
+      goal: goalSizerRef.current?.offsetWidth ?? 0,
+    })
+  }, [setupTopic, setupAudience, setupGoal, sizerIndex])
 
   /* ── Satisfied window + audience pulse ── */
   const [satisfiedWindow, setSatisfiedWindow] = useState(false)
@@ -512,11 +529,42 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
     if (file) uploadFile(file)
   }
 
-  function handleSuggestionClick(s: (typeof SUGGESTIONS)[number]) {
-    if (s.action === "present") { setPresentationMode(true); return }
-    if (isTrialMode) { router.push("/login"); return }
-    if (s.action === "upload-pdf") pdfInputRef.current?.click()
-    else if (s.action === "upload") fileInputRef.current?.click()
+  function buildContextMessage(): string | null {
+    const parts: string[] = []
+    if (setupTopic.trim()) parts.push(`I'm presenting on: ${setupTopic.trim()}`)
+    if (setupAudience.trim()) parts.push(`My audience is: ${setupAudience.trim()}`)
+    if (setupGoal.trim()) parts.push(`My goal is to: ${setupGoal.trim()}`)
+    return parts.length > 0 ? parts.join(". ") + "." : null
+  }
+
+  function handleStartAction(action: "present" | "upload-recording" | "upload-slides" | "just-chat") {
+    const context = buildContextMessage()
+    switch (action) {
+      case "present":
+        if (context) addMessage(context)
+        setPresentationMode(true)
+        break
+      case "upload-recording":
+        if (isTrialMode) { router.push("/login"); return }
+        if (context) addMessage(context)
+        fileInputRef.current?.click()
+        break
+      case "upload-slides":
+        if (isTrialMode) { router.push("/login"); return }
+        if (context) addMessage(context)
+        pdfInputRef.current?.click()
+        break
+      case "just-chat":
+        sendMessage(context ?? "Hey, I'm getting ready for a presentation.")
+        break
+    }
+  }
+
+  function handleSetupKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      handleStartAction("just-chat")
+    }
   }
 
   /* ── Shared recording overlay (used in both input bars) ── */
@@ -620,14 +668,14 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
           {isEmptyState ? (
 
             /* ════════════════════════════════════════════════
-               EMPTY STATE — original hero layout
+               EMPTY STATE — structured setup fields
             ════════════════════════════════════════════════ */
             <motion.div
               key="empty-state"
               initial={{ opacity: 1 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-6"
+              className="relative flex flex-1 flex-col items-center justify-center overflow-y-auto overflow-x-hidden px-6 py-8"
             >
               {/* Ambient glow */}
               <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
@@ -639,106 +687,155 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
                 </div>
               </div>
 
-              <div className="flex flex-col items-center text-center">
-                <FadeIn delay={0}>
-                  <p className="font-display mb-2 text-xs font-semibold uppercase tracking-widest text-primary">Vera</p>
-                </FadeIn>
+              <div className="flex w-full max-w-2xl flex-col items-center overflow-hidden">
                 <FadeIn delay={0.1}>
-                  <h1 className="font-display text-4xl font-bold tracking-tight text-foreground md:text-5xl">
-                    Rehearse with
-                    <span className="mt-1 block text-primary">
-                      <span className="relative inline-block pb-3">
-                        <AnimatePresence mode="wait">
-                          <motion.span
-                            ref={audienceRefCallback}
-                            key={AUDIENCES[audienceIndex]}
-                            className="relative z-10 inline-block"
-                            style={{
-                              textShadow: ["-4px 0","4px 0","0 4px","0 -4px","-3px 3px","3px 3px","-3px -3px","3px -3px","-2px 4px","2px 4px","-4px 2px","4px 2px","-2px -4px","2px -4px","-4px -2px","4px -2px"]
-                                .map((o) => `${o} 0 hsl(var(--background))`).join(", "),
-                            }}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -8 }}
-                            transition={{ duration: 0.25, ease: "easeInOut" }}
-                          >
-                            {AUDIENCES[audienceIndex]}
-                          </motion.span>
-                        </AnimatePresence>
+                  <div className="mt-2 flex w-full flex-col items-center gap-6 font-display text-center text-lg text-muted-foreground sm:text-xl md:text-2xl">
+                    {/* Topic */}
+                    <div className="flex flex-col items-center">
+                      <span>I&apos;m presenting</span>
+                      <span className="relative mt-1 inline-block max-w-full pb-1">
+                        <span ref={topicSizerRef} className="invisible whitespace-nowrap">{setupTopic.length > SETUP_EXAMPLES[sizerIndex].topic.length ? setupTopic : SETUP_EXAMPLES[sizerIndex].topic}</span>
+                        <input
+                          type="text"
+                          value={setupTopic}
+                          onChange={(e) => setSetupTopic(e.target.value)}
+                          onKeyDown={handleSetupKeyDown}
+                          className="absolute inset-x-0 top-0 z-10 w-full bg-transparent text-center text-foreground caret-primary focus:outline-none"
+                        />
+                        {!setupTopic && (
+                          <AnimatePresence mode="wait">
+                            <motion.span
+                              key={SETUP_EXAMPLES[exampleIndex].topic}
+                              initial={{ opacity: 0, y: 6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.25, ease: "easeInOut" }}
+                              className="pointer-events-none absolute inset-x-0 top-0 whitespace-nowrap text-center text-muted-foreground/30"
+                            >
+                              {SETUP_EXAMPLES[exampleIndex].topic}
+                            </motion.span>
+                          </AnimatePresence>
+                        )}
                         <motion.span
-                          className="absolute bottom-[0.18em] left-1/2 h-[3px] -translate-x-1/2 rounded-full bg-primary/30"
-                          animate={{ width: audienceWidth + 20 }}
+                          className="absolute bottom-0 left-1/2 h-[2.5px] -translate-x-1/2 rounded-full bg-primary/30"
+                          animate={{ width: blankWidths.topic + 20 }}
                           transition={{ duration: 0.35, ease: "easeInOut" }}
                         />
                       </span>
-                    </span>
-                  </h1>
-                </FadeIn>
-                <FadeIn delay={0.15}>
-                  <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground sm:text-base md:text-lg">
-                    Describe your audience and Vera will simulate them, giving you feedback that feels human.
-                  </p>
-                  {isTrialMode && (
-                    <p className="mt-2 text-xs text-primary sm:text-sm">Try 4 free messages — no account needed</p>
-                  )}
-                </FadeIn>
-
-                <FadeIn delay={0.25}>
-                  <form onSubmit={handleSubmit} className="mt-10 w-full max-w-3xl">
-                    <div className={`relative flex h-12 sm:h-14 items-center overflow-hidden rounded-2xl border bg-muted transition-colors ${
-                      recorder.isRecording ? "border-red-500/40" : "border-border focus-within:border-primary/30 focus-within:ring-1 focus-within:ring-primary/20"
-                    }`}>
-                      {recorder.isRecording ? recordingContent : (
-                        <>
-                          <button type="button" onClick={() => fileInputRef.current?.click()}
-                            disabled={isInputDisabled}
-                            className="absolute left-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-                            aria-label="Attach a file">
-                            <Paperclip className="h-4 w-4" />
-                          </button>
-                          <textarea value={input} onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(e) } }}
-                            placeholder={inputPlaceholder} rows={1} disabled={isInputDisabled}
-                            className="h-full w-full resize-none bg-transparent py-3 pl-12 pr-20 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-50 sm:py-3.5 sm:text-base"
-                          />
-                          <button type="button" onClick={handleStartRecording}
-                            disabled={isBusy || trialLimitReached || slideReview.isAnalyzing || !!input.trim()}
-                            className="absolute right-11 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
-                            aria-label="Start recording">
-                            <Mic className="h-4 w-4" />
-                          </button>
-                          {input.trim() ? (
-                            <button type="submit" disabled={isInputDisabled}
-                              className="absolute right-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
-                              aria-label="Send message">
-                              {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                            </button>
-                          ) : (
-                            <button type="button"
-                              onClick={() => setPresentationMode(true)}
-                              disabled={isBusy || trialLimitReached}
-                              className="absolute right-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
-                              aria-label="Enter presentation mode">
-                              <Smile className="h-4 w-4" />
-                            </button>
-                          )}
-                        </>
-                      )}
                     </div>
 
-                    <div className="mt-3 flex flex-wrap justify-center gap-2 px-1">
-                      {SUGGESTIONS.map((s) => (
-                        <button key={s.label} type="button" onClick={() => handleSuggestionClick(s)}
-                          disabled={isInputDisabled}
-                          className="group flex items-center gap-1 rounded-full border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition-all duration-150 hover:border-primary/30 hover:text-foreground active:scale-[0.98] disabled:opacity-50 sm:px-3 sm:py-1.5 sm:text-xs">
-                          <s.icon className="h-3 w-3 flex-shrink-0 text-muted-foreground/60 transition-colors group-hover:text-primary" />
-                          <span className="whitespace-nowrap">{s.label}</span>
-                        </button>
-                      ))}
+                    {/* Audience */}
+                    <div className="flex flex-col items-center">
+                      <span>to</span>
+                      <span className="relative mt-1 inline-block max-w-full pb-1">
+                        <span ref={audienceSizerRef} className="invisible whitespace-nowrap">{setupAudience.length > SETUP_EXAMPLES[sizerIndex].audience.length ? setupAudience : SETUP_EXAMPLES[sizerIndex].audience}</span>
+                        <input
+                          type="text"
+                          value={setupAudience}
+                          onChange={(e) => setSetupAudience(e.target.value)}
+                          onKeyDown={handleSetupKeyDown}
+                          className="absolute inset-x-0 top-0 z-10 w-full bg-transparent text-center text-foreground caret-primary focus:outline-none"
+                        />
+                        {!setupAudience && (
+                          <AnimatePresence mode="wait">
+                            <motion.span
+                              key={SETUP_EXAMPLES[exampleIndex].audience}
+                              initial={{ opacity: 0, y: 6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.25, ease: "easeInOut" }}
+                              className="pointer-events-none absolute inset-x-0 top-0 whitespace-nowrap text-center text-muted-foreground/30"
+                            >
+                              {SETUP_EXAMPLES[exampleIndex].audience}
+                            </motion.span>
+                          </AnimatePresence>
+                        )}
+                        <motion.span
+                          className="absolute bottom-0 left-1/2 h-[2.5px] -translate-x-1/2 rounded-full bg-primary/30"
+                          animate={{ width: blankWidths.audience + 20 }}
+                          transition={{ duration: 0.35, ease: "easeInOut" }}
+                        />
+                      </span>
                     </div>
 
-                  </form>
+                    {/* Goal */}
+                    <div className="flex flex-col items-center">
+                      <span>and I want to</span>
+                      <span className="relative mt-1 inline-block max-w-full pb-1">
+                        <span ref={goalSizerRef} className="invisible whitespace-nowrap">{setupGoal.length > SETUP_EXAMPLES[sizerIndex].goal.length ? setupGoal : SETUP_EXAMPLES[sizerIndex].goal}</span>
+                        <input
+                          type="text"
+                          value={setupGoal}
+                          onChange={(e) => setSetupGoal(e.target.value)}
+                          onKeyDown={handleSetupKeyDown}
+                          className="absolute inset-x-0 top-0 z-10 w-full bg-transparent text-center text-foreground caret-primary focus:outline-none"
+                        />
+                        {!setupGoal && (
+                          <AnimatePresence mode="wait">
+                            <motion.span
+                              key={SETUP_EXAMPLES[exampleIndex].goal}
+                              initial={{ opacity: 0, y: 6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.25, ease: "easeInOut" }}
+                              className="pointer-events-none absolute inset-x-0 top-0 whitespace-nowrap text-center text-muted-foreground/30"
+                            >
+                              {SETUP_EXAMPLES[exampleIndex].goal}
+                            </motion.span>
+                          </AnimatePresence>
+                        )}
+                        <motion.span
+                          className="absolute bottom-0 left-1/2 h-[2.5px] -translate-x-1/2 rounded-full bg-primary/30"
+                          animate={{ width: blankWidths.goal + 20 }}
+                          transition={{ duration: 0.35, ease: "easeInOut" }}
+                        />
+                      </span>
+                    </div>
+                  </div>
                 </FadeIn>
+
+                <FadeIn delay={0.2}>
+                  <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleStartAction("present")}
+                      className="flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 text-sm text-muted-foreground transition-all hover:border-primary/30 hover:text-foreground active:scale-[0.98]"
+                    >
+                      <Mic className="h-3.5 w-3.5 text-primary/60" />
+                      Present live
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStartAction("upload-recording")}
+                      className="flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 text-sm text-muted-foreground transition-all hover:border-primary/30 hover:text-foreground active:scale-[0.98]"
+                    >
+                      <Upload className="h-3.5 w-3.5 text-primary/60" />
+                      Upload recording
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStartAction("upload-slides")}
+                      className="flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 text-sm text-muted-foreground transition-all hover:border-primary/30 hover:text-foreground active:scale-[0.98]"
+                    >
+                      <FileText className="h-3.5 w-3.5 text-primary/60" />
+                      Upload slides
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStartAction("just-chat")}
+                      className="flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 text-sm text-muted-foreground transition-all hover:border-primary/30 hover:text-foreground active:scale-[0.98]"
+                    >
+                      <Send className="h-3.5 w-3.5 text-primary/60" />
+                      Just chat
+                    </button>
+                  </div>
+                </FadeIn>
+
+                {isTrialMode && (
+                  <FadeIn delay={0.3}>
+                    <p className="mt-6 text-xs text-primary sm:text-sm">Try 4 free messages — no account needed</p>
+                  </FadeIn>
+                )}
               </div>
             </motion.div>
 

@@ -48,7 +48,7 @@ export default function Page() {
   return (
     <>
       <LandingNavbar />
-      <section className="flex h-dvh flex-col pt-[70px]">
+      <section className="flex h-dvh flex-col overflow-x-hidden pt-[70px]">
         <CoachingInterface
           authToken={isTrialMode ? null : idToken}
           isTrialMode={isTrialMode}
