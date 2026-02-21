@@ -20,14 +20,45 @@ function ChatContent() {
     }
   }, [user])
 
-  // Handle post-checkout success
+  // Handle post-checkout success: verify the session server-side, then refresh local state
   useEffect(() => {
-    if (searchParams.get("checkout") === "success") {
-      refreshSubscription()
+    if (searchParams.get("checkout") !== "success") return
+    const sessionId = searchParams.get("session_id")
+
+    async function verifyCheckout() {
+      if (!user || !sessionId) {
+        // No session ID or not logged in — just refresh and show toast
+        await refreshSubscription()
+        toast.success("Welcome to Pro! You now have unlimited access.")
+        window.history.replaceState({}, "", "/chat")
+        return
+      }
+
+      try {
+        const token = await user.getIdToken()
+        const res = await fetch("/api/verify-checkout", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ session_id: sessionId }),
+        })
+
+        if (!res.ok) {
+          console.error("Checkout verification failed:", await res.text())
+        }
+      } catch (err) {
+        console.error("Checkout verification error:", err)
+      }
+
+      await refreshSubscription()
       toast.success("Welcome to Pro! You now have unlimited access.")
       window.history.replaceState({}, "", "/chat")
     }
-  }, [searchParams, refreshSubscription])
+
+    verifyCheckout()
+  }, [searchParams, refreshSubscription, user])
 
   if (loading || (user && !idToken)) {
     return (

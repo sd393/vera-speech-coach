@@ -22,7 +22,7 @@ const plans = [
   },
   {
     name: "Pro",
-    price: "$12",
+    price: "$4.99",
     period: "per month",
     description: "For professionals who present regularly",
     features: [
@@ -34,21 +34,6 @@ const plans = [
       "Presentation history",
     ],
     highlighted: true,
-  },
-  {
-    name: "Team",
-    price: "$29",
-    period: "per month",
-    description: "Collaborate and coach your entire team",
-    features: [
-      "Everything in Pro",
-      "Up to 10 team members",
-      "Shared audience templates",
-      "Team analytics dashboard",
-      "Admin controls",
-      "Priority support",
-    ],
-    highlighted: false,
   },
 ]
 
@@ -98,20 +83,15 @@ function PremiumContent() {
 
   function getCtaText(planName: string) {
     if (planName === "Free") {
-      if (plan === "free" || !user) return "Current Plan"
       return "Current Plan"
     }
-    if (planName === "Pro") {
-      if (plan === "pro") return "Current Plan"
-      return "Upgrade to Pro"
-    }
-    return "Contact Sales"
+    if (plan === "pro") return "Current Plan"
+    return "Upgrade to Pro"
   }
 
   function isDisabled(planName: string) {
     if (planName === "Free") return true
-    if (planName === "Pro") return plan === "pro" || checkoutLoading
-    return false
+    return plan === "pro" || checkoutLoading
   }
 
   function handleClick(planName: string) {
@@ -137,7 +117,7 @@ function PremiumContent() {
         />
       </div>
 
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-3xl">
         {/* Header */}
         <div className="mb-16 text-center">
           <a
@@ -155,7 +135,7 @@ function PremiumContent() {
         </div>
 
         {/* Plans grid */}
-        <div className="grid gap-8 md:grid-cols-3">
+        <div className="grid gap-8 md:grid-cols-2">
           {plans.map((p) => (
             <div
               key={p.name}

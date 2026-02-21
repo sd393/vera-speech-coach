@@ -58,7 +58,7 @@ describe('buildFullDeckSystemPrompt', () => {
 
   it('instructs holistic analysis of the full deck', () => {
     const prompt = buildFullDeckSystemPrompt(10)
-    expect(prompt).toContain('holistically')
+    expect(prompt).toContain('Read the full deck before assessing any individual slide')
   })
 })
 
