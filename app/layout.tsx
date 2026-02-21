@@ -1,6 +1,7 @@
 import React from "react"
 import type { Metadata, Viewport } from 'next'
 import { Libre_Caslon_Text } from 'next/font/google'
+import { Toaster } from 'sonner'
 
 import { AuthProvider } from '@/contexts/auth-context'
 import './globals.css'
@@ -32,6 +33,7 @@ export default function RootLayout({
     <html lang="en" className={libreCaslon.variable}>
       <body className="font-sans antialiased">
         <AuthProvider>{children}</AuthProvider>
+        <Toaster theme="dark" />
       </body>
     </html>
   )

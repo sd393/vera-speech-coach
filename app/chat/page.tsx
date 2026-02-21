@@ -1,13 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
+import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
 import { ChatNavbar } from "@/components/chat-navbar"
 import { CoachingInterface } from "@/components/coaching-interface"
 
 export default function ChatPage() {
-  const { user, loading } = useAuth()
+  const { user, loading, plan, refreshSubscription } = useAuth()
   const [idToken, setIdToken] = useState<string | null>(null)
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     if (user) {
@@ -16,6 +19,15 @@ export default function ChatPage() {
       setIdToken(null)
     }
   }, [user])
+
+  // Handle post-checkout success
+  useEffect(() => {
+    if (searchParams.get("checkout") === "success") {
+      refreshSubscription()
+      toast.success("Welcome to Pro! You now have unlimited access.")
+      window.history.replaceState({}, "", "/chat")
+    }
+  }, [searchParams, refreshSubscription])
 
   if (loading || (user && !idToken)) {
     return (
@@ -29,7 +41,7 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-screen flex-col">
-      <ChatNavbar isTrialMode={isTrialMode} />
+      <ChatNavbar isTrialMode={isTrialMode} plan={plan} />
       <CoachingInterface
         authToken={isTrialMode ? null : idToken}
         isTrialMode={isTrialMode}

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, type FormEvent } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 
 function getErrorMessage(code: string): string {
@@ -25,8 +25,10 @@ function getErrorMessage(code: string): string {
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading: authLoading, signIn, signUp, signInWithGoogle, resetPassword } = useAuth()
   const [isSignUp, setIsSignUp] = useState(false)
+  const redirect = searchParams.get("redirect")
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -36,9 +38,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      router.replace("/chat")
+      router.replace(redirect || "/chat")
     }
-  }, [authLoading, user, router])
+  }, [authLoading, user, router, redirect])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -47,10 +49,11 @@ export default function LoginPage() {
     try {
       if (isSignUp) {
         await signUp(email, password, name)
+        router.push(redirect || "/premium")
       } else {
         await signIn(email, password)
+        router.push(redirect || "/chat")
       }
-      router.push("/chat")
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code ?? ""
       setError(getErrorMessage(code))
@@ -64,7 +67,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await signInWithGoogle()
-      router.push("/chat")
+      router.push(redirect || "/chat")
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code ?? ""
       setError(getErrorMessage(code))

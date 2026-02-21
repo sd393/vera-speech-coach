@@ -57,6 +57,8 @@ const DECK_SUMMARY = {
 describe('useSlideReview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Prevent cleanup blob-delete fetch from hitting the real network
+    vi.stubGlobal('navigator', { ...navigator, sendBeacon: vi.fn().mockReturnValue(true) })
     vi.mocked(upload).mockResolvedValue({
       url: 'https://example.vercel-storage.com/deck.pdf',
       downloadUrl: 'https://example.vercel-storage.com/deck.pdf',

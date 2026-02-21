@@ -50,6 +50,7 @@ export function useChat(authToken?: string | null) {
     number | null
   >(null)
   const [trialLimitReached, setTrialLimitReached] = useState(false)
+  const [freeLimitReached, setFreeLimitReached] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const messagesRef = useRef<Message[]>([INITIAL_MESSAGE])
   const transcriptRef = useRef<string | null>(null)
@@ -130,6 +131,14 @@ export function useChat(authToken?: string | null) {
           const err = await response.json().catch(() => ({}))
           if (err.code === 'trial_limit_reached') {
             setTrialLimitReached(true)
+            setMessages((prev) =>
+              prev.filter((m) => m.id !== assistantMessageId)
+            )
+            setIsStreaming(false)
+            return
+          }
+          if (err.code === 'free_limit_reached') {
+            setFreeLimitReached(true)
             setMessages((prev) =>
               prev.filter((m) => m.id !== assistantMessageId)
             )
@@ -501,6 +510,7 @@ export function useChat(authToken?: string | null) {
     error,
     trialMessagesRemaining,
     trialLimitReached,
+    freeLimitReached,
     sendMessage,
     uploadFile,
     addMessage,

@@ -10,6 +10,7 @@ const nextConfig = {
   serverExternalPackages: [
     '@ffmpeg-installer/ffmpeg',
     'fluent-ffmpeg',
+    'firebase-admin',
   ],
 }
 

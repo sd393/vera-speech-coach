@@ -7,6 +7,8 @@ import {
   checkTrialLimit,
   incrementTrialUsage,
 } from '@/backend/trial-limit'
+import { verifyAuth } from '@/backend/auth'
+import { getUserPlan } from '@/backend/subscription'
 
 export async function handleChat(request: NextRequest) {
   const ip = getClientIp(request)
@@ -17,7 +19,14 @@ export async function handleChat(request: NextRequest) {
     )
   }
 
-  const isTrialUser = !request.headers.get('authorization')
+  const authResult = await verifyAuth(request)
+
+  // If verifyAuth returned a Response, it's a 401 error
+  if (authResult instanceof Response) {
+    return authResult
+  }
+
+  const isTrialUser = authResult === null
 
   if (isTrialUser) {
     const trial = checkTrialLimit(ip)
@@ -29,6 +38,21 @@ export async function handleChat(request: NextRequest) {
         }),
         { status: 403, headers: { 'Content-Type': 'application/json' } }
       )
+    }
+  } else {
+    // Authenticated user — check plan-based limits
+    const { plan } = await getUserPlan(authResult.uid)
+    if (plan !== 'pro') {
+      // Free authenticated users: 20 messages per 24h
+      if (!checkRateLimit('free:' + authResult.uid, 20, 86_400_000).allowed) {
+        return new Response(
+          JSON.stringify({
+            error: 'You\'ve reached your daily message limit. Upgrade to Pro for unlimited messages.',
+            code: 'free_limit_reached',
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
     }
   }
 

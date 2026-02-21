@@ -1,14 +1,16 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { User, Mail, CreditCard, LogOut } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
 
 export default function AccountPage() {
   const router = useRouter()
-  const { user, loading, signOut } = useAuth()
+  const { user, loading, plan, subscriptionLoading, signOut } = useAuth()
   const isSigningOut = useRef(false)
+  const [portalLoading, setPortalLoading] = useState(false)
 
   useEffect(() => {
     if (!loading && !user && !isSigningOut.current) {
@@ -31,6 +33,38 @@ export default function AccountPage() {
     await signOut()
     router.replace("/")
   }
+
+  async function handleManageSubscription() {
+    setPortalLoading(true)
+    try {
+      const token = await user!.getIdToken()
+      const res = await fetch("/api/billing-portal", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Failed to open billing portal")
+      }
+
+      const { url } = await res.json()
+      window.location.href = url
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Something went wrong")
+    } finally {
+      setPortalLoading(false)
+    }
+  }
+
+  const planLabel = plan === "pro" ? "Pro Plan" : "Free Plan"
+  const planDescription =
+    plan === "pro"
+      ? "Unlimited presentations and advanced features"
+      : "Basic presentation feedback"
 
   return (
     <div className="relative min-h-screen px-6 py-24">
@@ -121,19 +155,30 @@ export default function AccountPage() {
 
           <div className="mt-6 flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-foreground">Free Plan</p>
+              <p className="text-sm font-medium text-foreground">
+                {subscriptionLoading ? "Loading…" : planLabel}
+              </p>
               <p className="text-sm text-muted-foreground">
-                Unlimited presentations
+                {planDescription}
               </p>
             </div>
-            <div className="flex flex-col items-center gap-1">
-              <button
-                disabled
-                className="rounded-lg border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Upgrade
-              </button>
-              <p className="text-xs text-muted-foreground">Coming soon</p>
+            <div>
+              {plan === "pro" ? (
+                <button
+                  onClick={handleManageSubscription}
+                  disabled={portalLoading}
+                  className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {portalLoading ? "Loading…" : "Manage Subscription"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => router.push("/premium")}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/25"
+                >
+                  Upgrade
+                </button>
+              )}
             </div>
           </div>
         </div>

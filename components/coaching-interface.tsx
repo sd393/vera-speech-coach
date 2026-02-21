@@ -190,7 +190,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
 
   const {
     messages, researchMeta, isCompressing, isTranscribing, isResearching, isStreaming,
-    error, trialMessagesRemaining, trialLimitReached,
+    error, trialMessagesRemaining, trialLimitReached, freeLimitReached,
     sendMessage, uploadFile, addMessage, setSlideContext, clearError,
   } = useChat(authToken)
 
@@ -204,6 +204,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
   const [setupAudience, setSetupAudience] = useState("")
   const [setupGoal, setSetupGoal] = useState("")
   const [showTrialDialog, setShowTrialDialog] = useState(false)
+  const [showFreeLimitDialog, setShowFreeLimitDialog] = useState(false)
   const [presentationMode, setPresentationMode] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -339,7 +340,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
 
   /* ── Derived state ── */
   const isBusy = isCompressing || isTranscribing || isResearching || isStreaming
-  const isInputDisabled = isBusy || trialLimitReached || slideReview.isAnalyzing || recorder.isRecording
+  const isInputDisabled = isBusy || trialLimitReached || freeLimitReached || slideReview.isAnalyzing || recorder.isRecording
   const isEmptyState = messages.length === 1 && messages[0].role === "assistant"
 
   const faceState: FaceState = recorder.isRecording ? "listening"
@@ -368,6 +369,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
   }, [messages, isTranscribing, isStreaming])
 
   useEffect(() => { if (trialLimitReached) setShowTrialDialog(true) }, [trialLimitReached])
+  useEffect(() => { if (freeLimitReached) setShowFreeLimitDialog(true) }, [freeLimitReached])
 
   useEffect(() => {
     if (error) { toast.error(error); clearError() }
@@ -925,7 +927,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
                     {recorder.isRecording ? recordingContent : (
                       <>
                         <button type="button" onClick={() => fileInputRef.current?.click()}
-                          disabled={isBusy || trialLimitReached || slideReview.isAnalyzing}
+                          disabled={isBusy || trialLimitReached || freeLimitReached || slideReview.isAnalyzing}
                           className="absolute left-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                           aria-label="Attach a file">
                           <Paperclip className="h-4 w-4" />
@@ -937,7 +939,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
                           className="h-full w-full resize-none bg-transparent py-3 pl-12 pr-20 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-50 sm:py-3.5"
                         />
                         <button type="button" onClick={handleStartRecording}
-                          disabled={isBusy || trialLimitReached || slideReview.isAnalyzing || !!input.trim()}
+                          disabled={isBusy || trialLimitReached || freeLimitReached || slideReview.isAnalyzing || !!input.trim()}
                           className="absolute right-11 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
                           aria-label="Start recording">
                           <Mic className="h-4 w-4" />
@@ -951,7 +953,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
                         ) : (
                           <button type="button"
                             onClick={() => setPresentationMode(true)}
-                            disabled={isBusy || trialLimitReached}
+                            disabled={isBusy || trialLimitReached || freeLimitReached}
                             className="absolute right-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
                             aria-label="Enter presentation mode">
                             <Smile className="h-4 w-4" />
@@ -1106,6 +1108,21 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
           <DialogFooter className="flex flex-col gap-2 sm:flex-row">
             <a href="/login" className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
               Sign in
+            </a>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Free plan limit dialog */}
+      <Dialog open={showFreeLimitDialog} onOpenChange={setShowFreeLimitDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Daily message limit reached</DialogTitle>
+            <DialogDescription>You&apos;ve used all 20 of your daily messages. Upgrade to Pro for unlimited access.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row">
+            <a href="/premium" className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+              Upgrade to Pro
             </a>
           </DialogFooter>
         </DialogContent>
