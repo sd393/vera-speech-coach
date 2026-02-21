@@ -25,10 +25,7 @@ export function AudienceFace({ state, analyserNode, size = 200 }: AudienceFacePr
     const loop = () => {
       analyserNode.getByteFrequencyData(data)
       const avg = data.reduce((a, b) => a + b, 0) / data.length / 255
-      const s = 1 + avg * 0.04
-      if (imgRef.current) {
-        imgRef.current.style.transform = `scale(${s})`
-      }
+      if (imgRef.current) imgRef.current.style.transform = `scale(${1 + avg * 0.03})`
       rafRef.current = requestAnimationFrame(loop)
     }
     rafRef.current = requestAnimationFrame(loop)
@@ -38,7 +35,6 @@ export function AudienceFace({ state, analyserNode, size = 200 }: AudienceFacePr
     }
   }, [state, analyserNode])
 
-  // Aspect ratio of the source SVG (1696 x 2528)
   const aspect = 1696 / 2528
   const width = size * aspect
   const height = size
@@ -49,7 +45,6 @@ export function AudienceFace({ state, analyserNode, size = 200 }: AudienceFacePr
       aria-label="Vera, your AI coach"
       role="img"
     >
-
       <motion.img
         ref={imgRef}
         src="/face.svg"
@@ -57,26 +52,19 @@ export function AudienceFace({ state, analyserNode, size = 200 }: AudienceFacePr
         draggable={false}
         width={width}
         height={height}
-        style={{ position: "relative", zIndex: 1, userSelect: "none" }}
+        style={{ userSelect: "none" }}
         animate={
-          state === "idle"
-            ? { scale: [1, 1.01, 1], x: 0 }
-            : state === "thinking"
-              ? { x: [-3, 3, -3], scale: 1 }
-              : state === "listening"
-                ? { scale: 1, x: 0 }
-                : state === "speaking"
-                  ? { scale: [1, 1.015, 1], x: 0 }
-                  : { scale: 1, x: 0 }
+          state === "idle"       ? { scale: [1, 1.01, 1] }
+          : state === "thinking"   ? { x: [-2, 2, -2] }
+          : state === "speaking"   ? { scale: [1, 1.012, 1] }
+          : state === "satisfied"  ? { rotate: 1.5 }
+          : {}
         }
         transition={
-          state === "idle"
-            ? { scale: { duration: 3.8, repeat: Infinity, ease: "easeInOut" }, x: { duration: 0.5 } }
-            : state === "thinking"
-              ? { x: { duration: 2.6, repeat: Infinity, ease: "easeInOut" }, scale: { duration: 0.5 } }
-              : state === "speaking"
-                ? { scale: { duration: 1.6, repeat: Infinity, ease: "easeInOut" }, x: { duration: 0.5 } }
-                : { duration: 0.5 }
+          state === "idle"       ? { scale: { duration: 4, repeat: Infinity, ease: "easeInOut" } }
+          : state === "thinking"   ? { x: { duration: 3, repeat: Infinity, ease: "easeInOut" } }
+          : state === "speaking"   ? { scale: { duration: 1.8, repeat: Infinity, ease: "easeInOut" } }
+          : { duration: 0.6, ease: "easeInOut" }
         }
       />
     </div>
