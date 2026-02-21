@@ -244,6 +244,37 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
   const presentationModeRef = useRef(false)
   useEffect(() => { presentationModeRef.current = presentationMode }, [presentationMode])
 
+  // Stable ref to messages for use in callbacks (fetchPulseLabels, audio.onended)
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
+
+  function fetchPulseLabels() {
+    const recent = messagesRef.current
+      .filter(m => m.content.trim())
+      .slice(-4)
+      .map(m => ({ role: m.role as "user" | "assistant", content: m.content }))
+    if (recent.length === 0) return
+    fetch("/api/audience-pulse", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: recent }),
+    })
+      .then(r => {
+        if (!r.ok) throw new Error(`Pulse API ${r.status}`)
+        return r.json()
+      })
+      .then(({ labels }) => {
+        const validLabels = Array.isArray(labels)
+          ? labels.filter((l: unknown): l is string => typeof l === "string")
+          : []
+        if (validLabels.length > 0) {
+          setPulseLabels(validLabels)
+          setPulseIndex(0)
+        }
+      })
+      .catch((err) => { console.warn("[audience-pulse] failed:", err) })
+  }
+
   useEffect(() => {
     if (prevStreaming.current && !isStreaming) {
       prevStreaming.current = false
@@ -255,28 +286,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
         t = setTimeout(() => setSatisfiedWindow(false), 2000)
       }
 
-      const recent = messages
-        .filter(m => m.content.trim())
-        .slice(-4)
-        .map(m => ({ role: m.role as "user" | "assistant", content: m.content }))
-      if (recent.length > 0) {
-        fetch("/api/audience-pulse", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: recent }),
-        })
-          .then(r => r.json())
-          .then(({ labels }) => {
-            const validLabels = Array.isArray(labels)
-              ? labels.filter((l: unknown): l is string => typeof l === "string")
-              : []
-            if (validLabels.length > 0) {
-              setPulseLabels(validLabels)
-              setPulseIndex(0)
-            }
-          })
-          .catch(() => {})
-      }
+      fetchPulseLabels()
 
       if (presentationModeRef.current) {
         const lastAssistant = [...messages].reverse().find(m => m.role === "assistant" && m.content)
@@ -415,6 +425,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
           setTtsCaption("")
           ttsAudioRef.current = null
           if (presentationModeRef.current) {
+            fetchPulseLabels()
             setSatisfiedWindow(true)
             setTimeout(() => setSatisfiedWindow(false), 3000)
           }

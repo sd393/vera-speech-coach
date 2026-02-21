@@ -22,10 +22,10 @@ Rules:
 - Each caption is one complete thought, 8–14 words
 - Present tense, specific, human — not generic or abstract
 - No trailing punctuation
-- Return ONLY a JSON array of 3 strings, nothing else
+- Return a JSON object with a "labels" key containing an array of 3 strings
 
 Example output:
-["A room of Series A investors who've seen a hundred pitches this month", "Leaning in slightly — the market size number caught their attention", "Quietly wondering if the team has actually talked to customers yet"]`,
+{"labels": ["A room of Series A investors who've seen a hundred pitches this month", "Leaning in slightly — the market size number caught their attention", "Quietly wondering if the team has actually talked to customers yet"]}`,
       },
       ...messages,
     ],
