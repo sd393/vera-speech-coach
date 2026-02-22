@@ -319,7 +319,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
       fetchPulseLabels()
 
       if (presentationModeRef.current) {
-        const lastAssistant = [...messages].reverse().find(m => m.role === "assistant" && m.content)
+        const lastAssistant = [...messagesRef.current].reverse().find(m => m.role === "assistant" && m.content)
         if (lastAssistant?.content) speakText(lastAssistant.content)
       }
 
@@ -415,21 +415,31 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
   /* ── TTS functions (ElevenLabs with forced alignment) ── */
 
   const ttsSentencesRef = useRef<{ text: string; start: number; end: number }[]>([])
+  const ttsAbortRef = useRef<AbortController | null>(null)
 
   function speakText(text: string) {
     stopSpeaking()
     setIsTTSLoading(true)
 
+    // Abort any in-flight TTS fetch so its .then won't clobber state
+    ttsAbortRef.current?.abort()
+    const controller = new AbortController()
+    ttsAbortRef.current = controller
+
     fetch("/api/tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
+      signal: controller.signal,
     })
       .then(res => {
         if (!res.ok) throw new Error(`TTS failed: ${res.status}`)
         return res.json()
       })
       .then(({ audio, sentences }: { audio: string; sentences: { text: string; start: number; end: number }[] }) => {
+        // If aborted between fetch resolve and here, bail out
+        if (controller.signal.aborted) return
+
         ttsSentencesRef.current = sentences
         if (sentences.length > 0) setTtsCaption(sentences[0].text)
 
@@ -477,13 +487,16 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
           ttsAudioRef.current = null
         })
       })
-      .catch(() => {
+      .catch((err) => {
+        if (err instanceof Error && err.name === "AbortError") return
         setIsTTSLoading(false)
         setTtsCaption("")
       })
   }
 
   function stopSpeaking() {
+    ttsAbortRef.current?.abort()
+    ttsAbortRef.current = null
     if (ttsAudioRef.current) {
       ttsAudioRef.current.pause()
       ttsAudioRef.current = null
@@ -577,7 +590,14 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
   function handleSetupKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter") {
       e.preventDefault()
-      handleStartAction("just-chat")
+      const context = buildContextMessage()
+      if (context) {
+        // Fields filled — send context and start chatting
+        sendMessage(context)
+      } else {
+        // No fields — enter presentation mode directly
+        setPresentationMode(true)
+      }
     }
   }
 
@@ -709,7 +729,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
                     <div className="flex flex-col items-center">
                       <span>I&apos;m presenting</span>
                       <span className="relative mt-1 inline-block max-w-full pb-1">
-                        <span ref={topicSizerRef} className="invisible whitespace-nowrap">{setupTopic.length > SETUP_EXAMPLES[sizerIndex].topic.length ? setupTopic : SETUP_EXAMPLES[sizerIndex].topic}</span>
+                        <span ref={topicSizerRef} className="invisible whitespace-nowrap">{setupTopic ? setupTopic : SETUP_EXAMPLES[sizerIndex].topic}</span>
                         <input
                           type="text"
                           value={setupTopic}
@@ -743,7 +763,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
                     <div className="flex flex-col items-center">
                       <span>to</span>
                       <span className="relative mt-1 inline-block max-w-full pb-1">
-                        <span ref={audienceSizerRef} className="invisible whitespace-nowrap">{setupAudience.length > SETUP_EXAMPLES[sizerIndex].audience.length ? setupAudience : SETUP_EXAMPLES[sizerIndex].audience}</span>
+                        <span ref={audienceSizerRef} className="invisible whitespace-nowrap">{setupAudience ? setupAudience : SETUP_EXAMPLES[sizerIndex].audience}</span>
                         <input
                           type="text"
                           value={setupAudience}
@@ -777,7 +797,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
                     <div className="flex flex-col items-center">
                       <span>and I want to</span>
                       <span className="relative mt-1 inline-block max-w-full pb-1">
-                        <span ref={goalSizerRef} className="invisible whitespace-nowrap">{setupGoal.length > SETUP_EXAMPLES[sizerIndex].goal.length ? setupGoal : SETUP_EXAMPLES[sizerIndex].goal}</span>
+                        <span ref={goalSizerRef} className="invisible whitespace-nowrap">{setupGoal ? setupGoal : SETUP_EXAMPLES[sizerIndex].goal}</span>
                         <input
                           type="text"
                           value={setupGoal}
