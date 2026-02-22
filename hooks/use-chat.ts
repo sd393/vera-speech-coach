@@ -51,12 +51,14 @@ export function useChat(authToken?: string | null) {
   >(null)
   const [trialLimitReached, setTrialLimitReached] = useState(false)
   const [freeLimitReached, setFreeLimitReached] = useState(false)
+  const [awaitingAudience, setAwaitingAudience] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const messagesRef = useRef<Message[]>([INITIAL_MESSAGE])
   const transcriptRef = useRef<string | null>(null)
   const researchContextRef = useRef<string | null>(null)
   const slideContextRef = useRef<string | null>(null)
   const authTokenRef = useRef<string | null>(null)
+  const awaitingAudienceRef = useRef(false)
 
   // Keep refs in sync with state on each render
   messagesRef.current = messages
@@ -64,6 +66,7 @@ export function useChat(authToken?: string | null) {
   researchContextRef.current = researchContext
   slideContextRef.current = slideContext
   authTokenRef.current = authToken ?? null
+  awaitingAudienceRef.current = awaitingAudience
 
   // On mount for trial users, check cookie for prior trial usage
   useEffect(() => {
@@ -123,6 +126,7 @@ export function useChat(authToken?: string | null) {
             transcript: currentTranscript ?? undefined,
             researchContext: researchContextRef.current ?? undefined,
             slideContext: slideContextRef.current ?? undefined,
+            awaitingAudience: awaitingAudienceRef.current || undefined,
           }),
           signal: controller.signal,
         })
@@ -317,20 +321,13 @@ export function useChat(authToken?: string | null) {
       messagesRef.current = updatedMessages
       setMessages(updatedMessages)
 
-      // Determine if we need to run research before the chat response
-      const hasTranscript = transcriptRef.current !== null
-      const hasResearch = researchContextRef.current !== null
-      const uploadExists = updatedMessages.some((m) => m.attachment)
-      const uploadIndex = updatedMessages.findIndex((m) => m.attachment)
-      const postUploadUserMessages = updatedMessages
-        .slice(uploadIndex + 1)
-        .filter((m) => m.role === 'user')
-      // Trigger research on the first user message after upload (the audience
-      // description), as long as we have a transcript and haven't researched yet
-      const shouldResearch =
-        hasTranscript && !hasResearch && uploadExists && postUploadUserMessages.length >= 1
+      // When the user answers the audience question, clear awaitingAudience,
+      // run research with their answer, then stream the full reaction
+      const isAnsweringAudience = awaitingAudienceRef.current
+      if (isAnsweringAudience) {
+        setAwaitingAudience(false)
+        awaitingAudienceRef.current = false
 
-      if (shouldResearch) {
         await runResearchPipeline(transcriptRef.current!, updatedMessages)
       }
 
@@ -433,7 +430,12 @@ export function useChat(authToken?: string | null) {
         messagesRef.current = updatedWithTranscript
         setMessages(updatedWithTranscript)
 
-        // Automatically trigger a chat response now that we have the transcript
+        // Set awaitingAudience so the model asks who the audience is
+        // instead of giving a full reaction immediately
+        setAwaitingAudience(true)
+        awaitingAudienceRef.current = true
+
+        // Trigger a chat response — the model will ask about the audience
         await streamChatResponse(updatedWithTranscript, newTranscript)
       } catch (err: unknown) {
         setIsCompressing(false)
@@ -490,6 +492,8 @@ export function useChat(authToken?: string | null) {
     setSlideContext(null)
     researchContextRef.current = null
     slideContextRef.current = null
+    setAwaitingAudience(false)
+    awaitingAudienceRef.current = false
     setIsCompressing(false)
     setIsTranscribing(false)
     setIsResearching(false)

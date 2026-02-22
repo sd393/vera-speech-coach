@@ -39,6 +39,20 @@ Your job:
 2. Suggest possible causes: the recording may be silent, too quiet, or in a format that couldn't be processed.
 3. Ask them to try uploading again with a recording that contains clear, audible speech.`
 
+function buildPhase2AskAudience(transcript: string): string {
+  return `CURRENT PHASE: You Just Heard a Presentation — Ask About the Audience
+You were in the room. You listened. The transcript is below.
+
+Before sharing your full reaction, ask who they're presenting this to. Keep it brief and natural — one or two sentences. You want to know the audience so you can step into the right shoes and react from their perspective.
+
+Don't give your full reaction yet. Just ask about the audience. But acknowledge that you heard it — a brief, genuine nod to something that stood out, to show you were paying attention. Then ask who the audience is.
+
+TRANSCRIPT:
+"""
+${transcript}
+"""`
+}
+
 function buildPhase2WithTranscript(
   transcript: string,
   researchContext?: string
@@ -92,12 +106,17 @@ export function buildSystemPrompt(
   transcript?: string,
   researchContext?: string,
   slideContext?: string,
+  awaitingAudience?: boolean,
 ): string {
   let phaseInstructions: string
   if (transcript !== undefined) {
-    phaseInstructions = !transcript.trim()
-      ? PHASE_2_EMPTY_TRANSCRIPT
-      : buildPhase2WithTranscript(transcript, researchContext)
+    if (!transcript.trim()) {
+      phaseInstructions = PHASE_2_EMPTY_TRANSCRIPT
+    } else if (awaitingAudience) {
+      phaseInstructions = buildPhase2AskAudience(transcript)
+    } else {
+      phaseInstructions = buildPhase2WithTranscript(transcript, researchContext)
+    }
   } else if (slideContext) {
     phaseInstructions = buildSlideDeckPhase(slideContext)
   } else {

@@ -49,6 +49,7 @@ export const chatRequestSchema = z.object({
   transcript: z.string().max(100_000).optional(),
   researchContext: z.string().max(20_000).optional(),
   slideContext: z.string().max(30_000).optional(),
+  awaitingAudience: z.boolean().optional(),
 })
 
 export const researchRequestSchema = z.object({

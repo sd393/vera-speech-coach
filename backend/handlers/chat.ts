@@ -67,9 +67,9 @@ export async function handleChat(request: NextRequest) {
       )
     }
 
-    const { messages, transcript, researchContext, slideContext } = parsed.data
+    const { messages, transcript, researchContext, slideContext, awaitingAudience } = parsed.data
 
-    const systemPrompt = buildSystemPrompt(transcript, researchContext, slideContext)
+    const systemPrompt = buildSystemPrompt(transcript, researchContext, slideContext, awaitingAudience)
 
     const openaiMessages: Array<{
       role: 'system' | 'user' | 'assistant'

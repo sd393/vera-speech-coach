@@ -82,4 +82,25 @@ describe('buildSystemPrompt', () => {
     const prompt = buildSystemPrompt(undefined, undefined, undefined)
     expect(prompt).toContain('No presentation yet')
   })
+
+  it('asks about audience when awaitingAudience is true', () => {
+    const prompt = buildSystemPrompt('my transcript', undefined, undefined, true)
+    expect(prompt).toContain('Ask About the Audience')
+    expect(prompt).toContain('TRANSCRIPT:')
+    expect(prompt).toContain('my transcript')
+    expect(prompt).not.toContain('Tell them what it was like')
+  })
+
+  it('gives full reaction when awaitingAudience is false', () => {
+    const prompt = buildSystemPrompt('my transcript', undefined, undefined, false)
+    expect(prompt).toContain('You Just Heard a Presentation')
+    expect(prompt).not.toContain('Ask About the Audience')
+  })
+
+  it('gives full reaction with research when awaitingAudience is false', () => {
+    const prompt = buildSystemPrompt('my transcript', 'VC audience briefing', undefined, false)
+    expect(prompt).toContain('AUDIENCE RESEARCH BRIEFING')
+    expect(prompt).toContain('VC audience briefing')
+    expect(prompt).not.toContain('Ask About the Audience')
+  })
 })
