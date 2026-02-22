@@ -1,6 +1,10 @@
 "use client"
 
+import { Suspense, useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Check } from "lucide-react"
+import { toast } from "sonner"
+import { useAuth } from "@/contexts/auth-context"
 
 const plans = [
   {
@@ -14,13 +18,11 @@ const plans = [
       "Text-based feedback",
       "Standard response time",
     ],
-    cta: "Current Plan",
     highlighted: false,
-    disabled: true,
   },
   {
     name: "Pro",
-    price: "$12",
+    price: "$4.99",
     period: "per month",
     description: "For professionals who present regularly",
     features: [
@@ -31,43 +33,91 @@ const plans = [
       "Audio & video uploads up to 500MB",
       "Presentation history",
     ],
-    cta: "Upgrade to Pro",
     highlighted: true,
-    disabled: false,
-  },
-  {
-    name: "Team",
-    price: "$29",
-    period: "per month",
-    description: "Collaborate and coach your entire team",
-    features: [
-      "Everything in Pro",
-      "Up to 10 team members",
-      "Shared audience templates",
-      "Team analytics dashboard",
-      "Admin controls",
-      "Priority support",
-    ],
-    cta: "Contact Sales",
-    highlighted: false,
-    disabled: false,
   },
 ]
 
-export default function PremiumPage() {
+function PremiumContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { user, plan, loading } = useAuth()
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
+
+  useEffect(() => {
+    if (searchParams.get("checkout") === "canceled") {
+      toast.info("Checkout canceled. You can try again anytime.")
+      window.history.replaceState({}, "", "/premium")
+    }
+  }, [searchParams])
+
+  async function handleUpgrade() {
+    if (!user) {
+      router.push("/login?redirect=/premium")
+      return
+    }
+
+    setCheckoutLoading(true)
+    try {
+      const token = await user.getIdToken()
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Failed to start checkout")
+      }
+
+      const { url } = await res.json()
+      window.location.href = url
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Something went wrong")
+    } finally {
+      setCheckoutLoading(false)
+    }
+  }
+
+  function getCtaText(planName: string) {
+    if (planName === "Free") {
+      return "Current Plan"
+    }
+    if (plan === "pro") return "Current Plan"
+    return "Upgrade to Pro"
+  }
+
+  function isDisabled(planName: string) {
+    if (planName === "Free") return true
+    return plan === "pro" || checkoutLoading
+  }
+
+  function handleClick(planName: string) {
+    if (planName === "Pro" && plan !== "pro") {
+      handleUpgrade()
+    }
+  }
+
   return (
     <div className="relative min-h-screen px-6 py-24">
-      {/* Background gradient */}
+      {/* Dark background with warm glow */}
       <div
-        className="pointer-events-none absolute inset-0 -z-10"
+        className="pointer-events-none absolute inset-0 -z-10 bg-background"
         aria-hidden="true"
-        style={{
-          background:
-            "linear-gradient(135deg, hsl(200 40% 95%) 0%, hsl(165 35% 95%) 50%, hsl(190 30% 96%) 100%)",
-        }}
-      />
+      >
+        <div
+          className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full opacity-[0.08] blur-3xl"
+          style={{ background: "radial-gradient(circle, hsl(36 72% 50%), transparent 70%)" }}
+        />
+        <div
+          className="absolute -right-32 bottom-1/4 h-[400px] w-[400px] rounded-full opacity-[0.05] blur-3xl"
+          style={{ background: "radial-gradient(circle, hsl(34 50% 68%), transparent 70%)" }}
+        />
+      </div>
 
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-3xl">
         {/* Header */}
         <div className="mb-16 text-center">
           <a
@@ -85,39 +135,39 @@ export default function PremiumPage() {
         </div>
 
         {/* Plans grid */}
-        <div className="grid gap-8 md:grid-cols-3">
-          {plans.map((plan) => (
+        <div className="grid gap-8 md:grid-cols-2">
+          {plans.map((p) => (
             <div
-              key={plan.name}
+              key={p.name}
               className={`relative flex flex-col rounded-2xl border p-8 backdrop-blur-sm ${
-                plan.highlighted
+                p.highlighted
                   ? "border-primary bg-card shadow-xl shadow-primary/10"
                   : "border-border/60 bg-card/80"
               }`}
             >
-              {plan.highlighted && (
+              {p.highlighted && (
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-semibold text-primary-foreground">
                   Most Popular
                 </span>
               )}
 
               <h2 className="text-xl font-semibold text-foreground">
-                {plan.name}
+                {p.name}
               </h2>
               <div className="mt-4 flex items-baseline gap-1">
                 <span className="text-4xl font-bold text-foreground">
-                  {plan.price}
+                  {p.price}
                 </span>
                 <span className="text-sm text-muted-foreground">
-                  /{plan.period}
+                  /{p.period}
                 </span>
               </div>
               <p className="mt-3 text-sm text-muted-foreground">
-                {plan.description}
+                {p.description}
               </p>
 
               <ul className="mt-8 flex flex-1 flex-col gap-3">
-                {plan.features.map((feature) => (
+                {p.features.map((feature) => (
                   <li
                     key={feature}
                     className="flex items-start gap-3 text-sm text-foreground"
@@ -129,21 +179,37 @@ export default function PremiumPage() {
               </ul>
 
               <button
-                disabled={plan.disabled}
+                disabled={isDisabled(p.name)}
+                onClick={() => handleClick(p.name)}
                 className={`mt-8 rounded-lg px-6 py-2.5 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                  plan.highlighted
+                  p.highlighted && plan !== "pro"
                     ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/25"
-                    : plan.disabled
+                    : isDisabled(p.name)
                       ? "cursor-default bg-muted text-muted-foreground"
                       : "border border-border bg-background text-foreground hover:bg-accent"
                 }`}
               >
-                {plan.cta}
+                {checkoutLoading && p.name === "Pro" ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                    Redirecting…
+                  </span>
+                ) : (
+                  getCtaText(p.name)
+                )}
               </button>
             </div>
           ))}
         </div>
       </div>
     </div>
+  )
+}
+
+export default function PremiumPage() {
+  return (
+    <Suspense>
+      <PremiumContent />
+    </Suspense>
   )
 }

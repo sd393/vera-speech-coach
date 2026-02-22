@@ -31,10 +31,19 @@ vi.mock('@/backend/trial-limit', () => ({
   incrementTrialUsage: vi.fn(),
 }))
 
+vi.mock('@/backend/auth', () => ({
+  verifyAuth: vi.fn().mockResolvedValue(null),
+}))
+
+vi.mock('@/backend/subscription', () => ({
+  getUserPlan: vi.fn().mockResolvedValue({ plan: 'free', subscriptionStatus: null }),
+}))
+
 import { POST } from '@/app/api/chat/route'
 import { NextRequest } from 'next/server'
 import { checkRateLimit } from '@/backend/rate-limit'
 import { checkTrialLimit, incrementTrialUsage } from '@/backend/trial-limit'
+import { verifyAuth } from '@/backend/auth'
 
 function createRequest(
   body: object,
@@ -64,6 +73,7 @@ describe('POST /api/chat', () => {
     vi.clearAllMocks()
     vi.mocked(checkRateLimit).mockReturnValue({ allowed: true })
     vi.mocked(checkTrialLimit).mockReturnValue({ allowed: true, remaining: 3 })
+    vi.mocked(verifyAuth).mockResolvedValue(null) // default: trial user
     mockCreate.mockImplementation(() => createMockStream())
   })
 
@@ -168,6 +178,8 @@ describe('POST /api/chat', () => {
   })
 
   it('skips trial check when Authorization header is present', async () => {
+    vi.mocked(verifyAuth).mockResolvedValue({ uid: 'user123', email: 'test@test.com' })
+
     const request = createRequest(
       { messages: [{ role: 'user', content: 'Hello' }] },
       { Authorization: 'Bearer some-token' }
@@ -208,6 +220,8 @@ describe('POST /api/chat', () => {
   })
 
   it('does not include trial_remaining event for authenticated users', async () => {
+    vi.mocked(verifyAuth).mockResolvedValue({ uid: 'user123', email: 'test@test.com' })
+
     const request = createRequest(
       { messages: [{ role: 'user', content: 'Hello' }] },
       { Authorization: 'Bearer some-token' }
