@@ -3,6 +3,11 @@ import { NextRequest } from "next/server"
 
 const openai = new OpenAI()
 
+const VALID_EMOTIONS = new Set([
+  "neutral", "interested", "skeptical", "confused",
+  "amused", "impressed", "concerned", "bored",
+])
+
 export async function POST(req: NextRequest) {
   const { messages } = await req.json()
 
@@ -22,18 +27,19 @@ Rules:
 - One should be about something specific that was said
 - One should be a genuine question or doubt you have
 - One should be an honest feeling — interest, skepticism, confusion, agreement, whatever fits
-- Return a JSON object: {"labels": ["...", "...", "..."]}
+- Each thought has an emotion tag from this set: neutral, interested, skeptical, confused, amused, impressed, concerned, bored
+- Return a JSON object: {"labels": [{"text": "...", "emotion": "..."}, ...]}
 
 Good examples:
-{"labels": ["not sure that number is right", "okay this part is actually interesting", "wonder if they've tested this with real users"]}
-{"labels": ["heard this argument before somewhere", "the second point was clearer than the first", "i'd want to see the data on that"]}
+{"labels": [{"text": "not sure that number is right", "emotion": "skeptical"}, {"text": "okay this part is actually interesting", "emotion": "interested"}, {"text": "wonder if they've tested this with real users", "emotion": "confused"}]}
+{"labels": [{"text": "heard this argument before somewhere", "emotion": "bored"}, {"text": "the second point was clearer than the first", "emotion": "interested"}, {"text": "i'd want to see the data on that", "emotion": "skeptical"}]}
 
 Bad examples (too dramatic, too generic, too third-person):
-{"labels": ["A room of seasoned investors leaning forward", "The tension is palpable as the speaker continues", "Wondering if this will change everything"]}`,
+{"labels": [{"text": "A room of seasoned investors leaning forward", "emotion": "impressed"}, {"text": "The tension is palpable as the speaker continues", "emotion": "concerned"}, {"text": "Wondering if this will change everything", "emotion": "impressed"}]}`,
       },
       ...messages,
     ],
-    max_tokens: 150,
+    max_tokens: 200,
     temperature: 0.8,
     response_format: { type: "json_object" },
   })
@@ -42,14 +48,32 @@ Bad examples (too dramatic, too generic, too third-person):
     const raw = completion.choices[0]?.message?.content ?? "{}"
     const parsed = JSON.parse(raw)
     // Accept either { labels: [...] } or a bare array as the first array value found
-    const raw_labels: unknown[] = Array.isArray(parsed)
+    const rawLabels: unknown[] = Array.isArray(parsed)
       ? parsed
       : Array.isArray(parsed.labels)
       ? parsed.labels
       : (Object.values(parsed).find(v => Array.isArray(v)) as unknown[] | undefined) ?? []
-    // Guard: only keep string items (prevents message objects leaking in)
-    const labels = raw_labels.filter((item): item is string => typeof item === "string")
-    return Response.json({ labels: labels.slice(0, 3) })
+
+    // Normalize: accept both {text, emotion} objects and plain strings (backwards compat)
+    const labels = rawLabels
+      .slice(0, 3)
+      .map((item) => {
+        if (typeof item === "string") {
+          return { text: item, emotion: "neutral" as const }
+        }
+        if (item && typeof item === "object" && "text" in item) {
+          const obj = item as { text: unknown; emotion?: unknown }
+          const text = typeof obj.text === "string" ? obj.text : ""
+          const emotion = typeof obj.emotion === "string" && VALID_EMOTIONS.has(obj.emotion)
+            ? obj.emotion
+            : "neutral"
+          return { text, emotion }
+        }
+        return null
+      })
+      .filter((item): item is { text: string; emotion: string } => item !== null && item.text.length > 0)
+
+    return Response.json({ labels })
   } catch {
     return Response.json({ labels: [] })
   }

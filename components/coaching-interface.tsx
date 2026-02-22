@@ -27,7 +27,7 @@ import { useRecorder } from "@/hooks/use-recorder"
 import { useSlideReview, type DeckFeedback, type SlideFeedback } from "@/hooks/use-slide-review"
 import { FadeIn } from "@/components/motion"
 import { SlidePanel } from "@/components/slide-panel"
-import { AudienceFace, type FaceState } from "@/components/audience-face"
+import { AudienceFace, type FaceState, type FaceEmotion, isValidFaceEmotion } from "@/components/audience-face"
 import {
   Dialog,
   DialogContent,
@@ -250,7 +250,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
 
   /* ── Satisfied window + audience pulse ── */
   const [satisfiedWindow, setSatisfiedWindow] = useState(false)
-  const [pulseLabels, setPulseLabels] = useState<string[]>([])
+  const [pulseLabels, setPulseLabels] = useState<{ text: string; emotion: FaceEmotion }[]>([])
   const [pulseIndex, setPulseIndex] = useState(0)
   const prevStreaming = useRef(false)
 
@@ -282,9 +282,21 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
         return r.json()
       })
       .then(({ labels }) => {
-        const validLabels = Array.isArray(labels)
-          ? labels.filter((l: unknown): l is string => typeof l === "string")
-          : []
+        if (!Array.isArray(labels)) return
+        const validLabels = labels
+          .map((l: unknown) => {
+            // Handle {text, emotion} objects from updated API
+            if (l && typeof l === "object" && "text" in l) {
+              const obj = l as { text: unknown; emotion?: unknown }
+              const text = typeof obj.text === "string" ? obj.text : ""
+              const emotion: FaceEmotion = isValidFaceEmotion(obj.emotion) ? obj.emotion : "neutral"
+              return text ? { text, emotion } : null
+            }
+            // Backwards compat: plain string
+            if (typeof l === "string") return { text: l, emotion: "neutral" as FaceEmotion }
+            return null
+          })
+          .filter((l): l is { text: string; emotion: FaceEmotion } => l !== null)
         if (validLabels.length > 0) {
           setPulseLabels(validLabels)
           setPulseIndex(0)
@@ -635,7 +647,8 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
 
   /* ── Sub-label beneath face (active chat only) ── */
   const currentPulse = pulseLabels[pulseIndex] ?? null
-  const audienceLabel = currentPulse
+  const currentEmotion: FaceEmotion = currentPulse?.emotion ?? "neutral"
+  const audienceLabel = currentPulse?.text
     ?? researchMeta?.audienceSummary
     ?? (slideReview.deckSummary?.audienceAssumed ? `Presenting to ${slideReview.deckSummary.audienceAssumed}` : null)
     ?? "In the room with you"
@@ -992,7 +1005,7 @@ export function CoachingInterface({ authToken, isTrialMode, onChatStart }: Coach
             </button>
 
             {/* Face */}
-            <AudienceFace state={faceState} analyserNode={recorder.analyserNode} size={280} />
+            <AudienceFace state={faceState} analyserNode={recorder.analyserNode} size={280} emotion={currentEmotion} />
 
             {/* Caption area — audience thoughts when idle, current sentence when speaking */}
             <div className="mt-4 flex h-12 items-center justify-center px-6">
