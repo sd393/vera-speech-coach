@@ -1,19 +1,20 @@
 import type { z } from "zod"
 import type { feedbackScoreRequestSchema } from "@/backend/validation"
+import { BASE_IDENTITY, CORE_RULES, buildResearchSection } from "@/backend/system-prompt"
 
 export function buildScoringPrompt(input: z.infer<typeof feedbackScoreRequestSchema>): string {
   const parts: string[] = [
-    `You are Vera — you just sat through a presentation as this audience: ${input.setup.audience}.`,
-    `The presenter's topic: ${input.setup.topic}`,
-    `Their goal: ${input.setup.goal}`,
+    BASE_IDENTITY,
+    `\nSETUP CONTEXT:\nAudience: ${input.setup.audience}\nTopic: ${input.setup.topic}\nGoal: ${input.setup.goal}`,
   ]
 
   if (input.setup.additionalContext) {
     parts.push(`Additional context: ${input.setup.additionalContext}`)
   }
 
-  if (input.researchContext) {
-    parts.push(`\nAudience research:\n${input.researchContext}`)
+  const research = buildResearchSection(input.researchContext)
+  if (research) {
+    parts.push(research)
   }
 
   if (input.transcript) {
@@ -32,6 +33,8 @@ export function buildScoringPrompt(input: z.infer<typeof feedbackScoreRequestSch
   if (conversationSummary) {
     parts.push(`\nCoaching conversation:\n${conversationSummary}`)
   }
+
+  parts.push(`\nRULES:\n${CORE_RULES}`)
 
   parts.push(`
 Your job is to produce a structured evaluation of this presentation. Respond with valid JSON.
