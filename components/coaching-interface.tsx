@@ -260,7 +260,6 @@ export function CoachingInterface({ authToken }: CoachingInterfaceProps) {
       audiencePulse: audiencePulseHistory,
       slideReview: slideReviewPayload,
       researchContext: researchContext ?? null,
-      deliveryAnalytics: deliveryAnalytics ?? null,
       scores: null as SessionScores | SessionScoresV2 | null,
     }
 
