@@ -27,6 +27,12 @@ export function ChatNavbar({ plan }: ChatNavbarProps) {
             </Link>
           )}
           <Link
+            href="/history"
+            className="text-sm font-medium text-foreground transition-colors hover:text-foreground/80"
+          >
+            History
+          </Link>
+          <Link
             href="/account"
             className="text-sm font-medium text-foreground transition-colors hover:text-foreground/80"
           >

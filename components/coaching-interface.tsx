@@ -225,12 +225,14 @@ export function CoachingInterface({ authToken }: CoachingInterfaceProps) {
           setTtsCaption("")
           URL.revokeObjectURL(url)
           ttsAudioRef.current = null
+          toast.error("Browser blocked audio playback. Tap anywhere and try again.")
         })
       })
       .catch((err) => {
         if (err instanceof Error && err.name === "AbortError") return
         setIsTTSLoading(false)
         setTtsCaption("")
+        toast.error("Vera's voice is unavailable right now.")
       })
   }
 

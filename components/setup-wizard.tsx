@@ -368,15 +368,30 @@ export const SetupWizard = React.memo(function SetupWizard({
                       + Add more context
                     </button>
                   ) : (
-                    <textarea
-                      autoFocus
-                      rows={3}
-                      value={setupAdditional}
-                      onChange={(e) => setSetupAdditional(e.target.value)}
-                      onKeyDown={handleSetupKeyDown}
-                      placeholder="Anything else Vera should know"
-                      className="w-full max-w-sm resize-none rounded-xl border border-border bg-muted px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/30 focus:outline-none focus:ring-1 focus:ring-primary/20"
-                    />
+                    <div className="relative pb-1 text-center" style={{ width: 320, maxWidth: "90vw" }}>
+                      <textarea
+                        autoFocus
+                        rows={1}
+                        value={setupAdditional}
+                        onChange={(e) => {
+                          setSetupAdditional(e.target.value)
+                          const el = e.target
+                          el.style.height = "auto"
+                          el.style.height = `${el.scrollHeight}px`
+                        }}
+                        onKeyDown={handleSetupKeyDown}
+                        onBlur={() => { if (!setupAdditional.trim()) setShowAdditional(false) }}
+                        placeholder="Anything else Vera should know..."
+                        className="w-full resize-none overflow-hidden bg-transparent text-center font-display text-sm text-foreground caret-primary placeholder:text-muted-foreground/40 focus:outline-none"
+                        style={{ minHeight: "1.5rem" }}
+                      />
+                      <motion.span
+                        className="absolute bottom-0 left-1/2 h-[2px] -translate-x-1/2 rounded-full bg-primary/30"
+                        initial={{ width: 0 }}
+                        animate={{ width: "100%" }}
+                        transition={{ duration: 0.3, ease: "easeOut" }}
+                      />
+                    </div>
                   )}
                 </div>
               </FadeIn>
