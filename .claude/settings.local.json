@@ -36,7 +36,10 @@
       "Bash(GIT_EDITOR=true git rebase:*)",
       "WebSearch",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:www.npmjs.com)"
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(cd:*)",
+      "Bash(cd \"C:\\\\Users\\\\ezhou\\\\Documents\\\\demian\" && npm install @react-pdf/renderer 2>&1)",
+      "Bash(npm install:*)"
     ]
   }
 }
