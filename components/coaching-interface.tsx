@@ -13,6 +13,7 @@ import { saveSession, type SessionScores, type SessionScoresV2 } from "@/lib/ses
 import { useCoachingSession } from "@/hooks/use-coaching-session"
 import { formatAnalyticsSummary } from "@/lib/format-delivery-analytics"
 import { useRecorder } from "@/hooks/use-recorder"
+import { useRealtimeSession } from "@/hooks/use-realtime-session"
 import { useSlideReview } from "@/hooks/use-slide-review"
 import { useContextFile } from "@/hooks/use-context-file"
 import { useTTS } from "@/hooks/use-tts"
@@ -80,12 +81,14 @@ export function CoachingInterface({ authToken }: CoachingInterfaceProps) {
 
   const { user } = useAuth()
   const recorder = useRecorder()
+  const realtimeSession = useRealtimeSession(user?.displayName || undefined)
   const slideReview = useSlideReview(authToken)
   const contextFileHook = useContextFile(authToken)
   const hasSlidePanel = slideReview.panelOpen
 
   /* ── State ── */
   const [presentationMode, setPresentationMode] = useState(false)
+  const [realtimeMode, setRealtimeMode] = useState(false)
   const [navigatingToFeedback, setNavigatingToFeedback] = useState(false)
   const [satisfiedWindow, setSatisfiedWindow] = useState(false)
   const sessionSaveTriggered = useRef(false)
@@ -93,6 +96,10 @@ export function CoachingInterface({ authToken }: CoachingInterfaceProps) {
   const pendingUploadRef = useRef(false)
   const recordingInputRef = useRef<HTMLInputElement>(null)
   const savedSetupRef = useRef<{ context: SetupContext | null; message: string | null }>({ context: null, message: null })
+
+  // Realtime transcript override — used when saving after a realtime session
+  const realtimeTranscriptRef = useRef<{ transcript: string; messages: { role: string; content: string }[] } | null>(null)
+
   const presentationModeRef = useRef(false)
   useEffect(() => { presentationModeRef.current = presentationMode }, [presentationMode])
 
@@ -170,9 +177,16 @@ export function CoachingInterface({ authToken }: CoachingInterfaceProps) {
   /* ── Derived state ── */
 
   const isBusy = useMemo(() => isCompressing || isTranscribing || isResearching || isStreaming, [isCompressing, isTranscribing, isResearching, isStreaming])
-  const isEmptyState = messages.length === 0
+  const isEmptyState = messages.length === 0 && !realtimeMode
 
-  const faceState: FaceState = recorder.isRecording ? "listening"
+  // Derive face state — realtime mode uses voice state from WebRTC session
+  const realtimeFaceState: FaceState = realtimeSession.voiceState === 'listening' ? "listening"
+    : realtimeSession.voiceState === 'processing' ? "thinking"
+    : realtimeSession.voiceState === 'vera-speaking' ? "speaking"
+    : "idle"
+
+  const faceState: FaceState = realtimeMode ? (satisfiedWindow ? "satisfied" : realtimeFaceState)
+    : recorder.isRecording ? "listening"
     : isProcessingHeld ? "thinking"
     : ((!presentationMode && isStreaming) || isTTSSpeaking) ? "speaking"
     : satisfiedWindow ? "satisfied"
@@ -236,9 +250,16 @@ export function CoachingInterface({ authToken }: CoachingInterfaceProps) {
       ...(fileContext ? { fileContext } : {}),
     }
 
-    const strippedMessages = messages
-      .filter((m) => m.content?.trim())
-      .map((m) => ({ role: m.role, content: m.content }))
+    // For realtime mode, use the transcript entries captured at disconnect
+    const rtOverride = realtimeTranscriptRef.current
+    realtimeTranscriptRef.current = null
+
+    const strippedMessages = rtOverride?.messages
+      ?? messages
+        .filter((m) => m.content?.trim())
+        .map((m) => ({ role: m.role, content: m.content }))
+
+    const effectiveTranscript = rtOverride?.transcript ?? transcript
 
     const slideReviewPayload = slideReview.deckSummary
       ? {
@@ -255,7 +276,7 @@ export function CoachingInterface({ authToken }: CoachingInterfaceProps) {
     const sessionPayload = {
       userId: user.uid,
       setup,
-      transcript: transcript ?? null,
+      transcript: effectiveTranscript ?? null,
       messages: strippedMessages,
       audiencePulse: audiencePulseHistory,
       slideReview: slideReviewPayload,
@@ -277,6 +298,29 @@ export function CoachingInterface({ authToken }: CoachingInterfaceProps) {
     }
 
     router.push(`/feedback/${sessionId}`)
+
+    user.getIdToken().then((token) => {
+      fetch("/api/feedback-score", {
+        method: "POST",
+        headers: buildAuthHeaders(token),
+        body: JSON.stringify({
+          sessionId,
+          transcript: effectiveTranscript ?? undefined,
+          setup,
+          messages: strippedMessages,
+          researchContext: researchContext ?? undefined,
+          slideContext: slideContext ?? undefined,
+          deliveryAnalyticsSummary: deliveryAnalytics ? formatAnalyticsSummary(deliveryAnalytics) : undefined,
+        }),
+      })
+        .then(async (res) => {
+          if (res.ok) {
+            const { scores } = await res.json()
+            await updateSessionScores(sessionId, scores as SessionScoresV2)
+          }
+        })
+        .catch((err) => console.warn("[feedback-score] Scoring failed:", err))
+    })
   }
 
   // When feedback completes (stage → followup), save and navigate
@@ -290,6 +334,7 @@ export function CoachingInterface({ authToken }: CoachingInterfaceProps) {
 
   useEffect(() => { if (error) { toast.error(error); clearError() } }, [error, clearError])
   useEffect(() => { if (slideReview.error) toast.error(slideReview.error) }, [slideReview.error])
+  useEffect(() => { if (realtimeSession.error) toast.error(realtimeSession.error) }, [realtimeSession.error])
 
   // Fetch pulse labels after transcription completes in presentation mode
   const prevTranscribingRef = useRef(false)
@@ -299,6 +344,28 @@ export function CoachingInterface({ authToken }: CoachingInterfaceProps) {
     }
     prevTranscribingRef.current = isTranscribing
   }, [isTranscribing, presentationMode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch pulse labels when Vera finishes speaking in realtime mode
+  const prevRealtimeEntriesLen = useRef(0)
+  useEffect(() => {
+    if (!realtimeMode) return
+    const entries = realtimeSession.transcriptEntries
+    if (entries.length <= prevRealtimeEntriesLen.current) {
+      prevRealtimeEntriesLen.current = entries.length
+      return
+    }
+    prevRealtimeEntriesLen.current = entries.length
+    const last = entries[entries.length - 1]
+    if (last.role !== 'assistant') return
+
+    const recent = entries.slice(-4).map(e => ({
+      role: e.role === 'user' ? 'user' as const : 'assistant' as const,
+      content: e.text,
+    }))
+    fetchPulseLabels(recent)
+    setSatisfiedWindow(true)
+    setTimeout(() => setSatisfiedWindow(false), 3000)
+  }, [realtimeMode, realtimeSession.transcriptEntries]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (slideReview.deckSummary && slideReview.slideFeedbacks.length > 0) {
@@ -357,7 +424,7 @@ export function CoachingInterface({ authToken }: CoachingInterfaceProps) {
   }
 
   function handleModeSelectFromWizard(
-    mode: "present" | "upload-recording",
+    mode: "present" | "upload-recording" | "practice-live",
     setupCtx: SetupContext | null,
     contextMsg: string | null
   ) {
@@ -377,6 +444,12 @@ export function CoachingInterface({ authToken }: CoachingInterfaceProps) {
       if (setupCtx) startPresentation(setupCtx)
       if (contextMsg) addMessage(contextMsg)
       if (contextMsg) fetchPulseLabels([{ role: "user", content: `I'm about to present to you. ${contextMsg}` }])
+      return
+    }
+
+    if (mode === "practice-live") {
+      setRealtimeMode(true)
+      setPresentationMode(true)
       return
     }
 
@@ -405,11 +478,46 @@ export function CoachingInterface({ authToken }: CoachingInterfaceProps) {
     slideReview.uploadAndAnalyze(file, audienceContext, undefined, existingBlobUrl)
   }
 
+  function handleRealtimeStart() {
+    realtimeSession.connect(
+      savedSetupRef.current.context,
+      researchContext,
+      authToken ?? null,
+    )
+  }
+
   function handlePresentationFinish() {
     stopSpeaking()
     setNavigatingToFeedback(true)
     setPresentationMode(false)
     finishPresentation()
+  }
+
+  function handleRealtimeFinish() {
+    // Capture transcript data before disconnecting (disconnect clears state)
+    const realtimeTranscript = realtimeSession.fullTranscript
+    const realtimeMessages = realtimeSession.transcriptEntries.map(e => ({
+      role: e.role === 'user' ? 'user' : 'assistant',
+      content: e.text,
+    }))
+
+    realtimeSession.disconnect()
+    setRealtimeMode(false)
+    setPresentationMode(false)
+
+    if (realtimeTranscript) {
+      // Store the realtime data for saveAndNavigateToFeedback to pick up
+      realtimeTranscriptRef.current = {
+        transcript: realtimeTranscript,
+        messages: realtimeMessages,
+      }
+      // Ensure the stage hook has setup context so the save works
+      const setupCtx = savedSetupRef.current.context
+      if (setupCtx && stage === 'define') startPresentation(setupCtx)
+      saveAndNavigateToFeedback()
+    } else {
+      toast.error("No conversation was recorded. Try presenting again.")
+    }
   }
 
   /* ── Render ── */
@@ -459,6 +567,14 @@ export function CoachingInterface({ authToken }: CoachingInterfaceProps) {
             onStopRecording={handleStopRecording}
             onFinish={handlePresentationFinish}
             onSlideUpload={handlePresentationSlideUpload}
+            realtimeMode={realtimeMode}
+            realtimeConnectionState={realtimeSession.connectionState}
+            realtimeVoiceState={realtimeSession.voiceState}
+            realtimeCaption={realtimeSession.currentCaption}
+            realtimeElapsed={realtimeSession.elapsed}
+            realtimeAnalyserNode={realtimeSession.outputAnalyserNode}
+            onRealtimeStart={handleRealtimeStart}
+            onRealtimeDisconnect={handleRealtimeFinish}
           />
         )}
       </AnimatePresence>

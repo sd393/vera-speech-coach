@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react"
 import dynamic from "next/dynamic"
 import { AnimatePresence, motion } from "framer-motion"
-import { Loader2, ArrowRight, Upload, Mic, Paperclip, FileText, X } from "lucide-react"
+import { Loader2, ArrowRight, Upload, Mic, Radio, Paperclip, FileText, X } from "lucide-react"
 import { toast } from "sonner"
 import { FadeIn } from "@/components/motion"
 
@@ -27,7 +27,7 @@ interface SetupWizardProps {
   isCompressing: boolean
   isTranscribing: boolean
   onResearchStart: (audience: string, opts?: { topic?: string; goal?: string; additionalContext?: string }) => void
-  onModeSelect: (mode: "present" | "upload-recording", setupContext: SetupContext | null, contextMessage: string | null) => void
+  onModeSelect: (mode: "present" | "upload-recording" | "practice-live", setupContext: SetupContext | null, contextMessage: string | null) => void
   /** If provided, called instead of the normal submit flow (e.g. to redirect unauthenticated users). */
   onReady?: () => void
   contextFile?: ContextFileInfo | null
@@ -236,7 +236,9 @@ export const SetupWizard = React.memo(function SetupWizard({
     }
   }
 
-  function handleModeSelectInternal(mode: "present" | "upload-recording") {
+  const hasWebRTC = typeof window !== 'undefined' && typeof RTCPeerConnection !== 'undefined'
+
+  function handleModeSelectInternal(mode: "present" | "upload-recording" | "practice-live") {
     onModeSelect(mode, buildSetupContext(), buildContextMessage())
   }
 
@@ -574,14 +576,27 @@ export const SetupWizard = React.memo(function SetupWizard({
                 <p className="mt-1 text-sm text-muted-foreground/60">Choose how you&apos;d like to deliver your presentation</p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => handleModeSelectInternal("present")}
-                className="group flex items-center gap-3 rounded-full border border-primary/30 bg-primary/5 px-6 py-3 text-sm font-medium text-foreground transition-all hover:bg-primary/10 hover:border-primary/40 active:scale-[0.98]"
-              >
-                <Mic className="h-4 w-4 text-primary/70" />
-                Present live
-              </button>
+              <div className="flex flex-col items-center gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => handleModeSelectInternal("present")}
+                  className="group flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-6 py-3 text-sm font-medium text-foreground transition-all hover:bg-primary/10 hover:border-primary/40 active:scale-[0.98]"
+                >
+                  <Mic className="h-4 w-4 text-primary/70" />
+                  Present live
+                </button>
+
+                {hasWebRTC && (
+                  <button
+                    type="button"
+                    onClick={() => handleModeSelectInternal("practice-live")}
+                    className="group flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-6 py-3 text-sm font-medium text-foreground transition-all hover:bg-primary/10 hover:border-primary/40 active:scale-[0.98]"
+                  >
+                    <Radio className="h-4 w-4 text-primary/70" />
+                    Practice realtime
+                  </button>
+                )}
+              </div>
 
               <div className="flex items-center gap-3 mt-2">
                 <button
