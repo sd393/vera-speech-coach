@@ -23,6 +23,8 @@ export const RATE_LIMITS = {
   contextExtract: { limit: 5, windowMs: 60_000 },
   /** Blob deletion — IP-level burst protection */
   blobDelete: { limit: 10, windowMs: 60_000 },
+  /** Realtime token — expensive resource (~$0.06/min), per-user limit */
+  realtimeToken: { limit: 3, windowMs: 300_000 },
 } as const satisfies Record<string, { limit: number; windowMs: number }>
 
 /** Longest window across all configs — used for cleanup sweep threshold. */

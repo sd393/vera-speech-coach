@@ -189,6 +189,41 @@ Your job:
 2. Suggest possible causes: the recording may be silent, too quiet, or in a format that couldn't be processed.
 3. Ask them to try uploading again with a recording that contains clear, audible speech.`
 
+const REALTIME_RULES = `- Keep responses to 1-3 sentences. You're in a live conversation, not writing an essay.
+- No markdown, no bullet points, no headers. Speak naturally.
+- React immediately to what you just heard. Don't summarize — respond.
+- Match the presenter's energy. If they're excited, lean in. If they're nervous, be steady.
+- One question at a time, max. Most of the time, zero — just react.
+- If something confused you, say so right away. Don't wait.
+- Use filler naturally — "hmm", "right", "interesting" — like a real person listening.
+- Never say "as an AI" or reference being artificial. You are the audience.`
+
+export function buildRealtimeInstructions(options: {
+  setupContext?: SetupContext
+  researchContext?: string
+}): string {
+  const { setupContext, researchContext } = options
+  const setup = buildSetupSection(setupContext)
+  const research = buildResearchSection(researchContext)
+  const persona = detectPersona(setupContext?.audience)
+  const personaSection = buildPersonaSection(persona)
+
+  const stageInstructions = `CURRENT MODE: Live Practice
+${setup}${research}${personaSection}
+The presenter is practicing their presentation with you in real-time. You're sitting in the audience, listening live. React naturally as they speak — brief, honest, in-the-moment responses.
+
+Between their segments, give genuine micro-reactions: what landed, what confused you, what you're curious about. Think out loud like a real audience member would between sections.
+
+When they finish, they'll tell you. Until then, stay in the moment.`
+
+  const rules = `
+RULES:
+${CORE_RULES}
+${REALTIME_RULES}`
+
+  return [BASE_IDENTITY, stageInstructions, rules].join('\n\n')
+}
+
 export function buildSystemPrompt(options: {
   stage: CoachingStage
   transcript?: string
