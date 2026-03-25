@@ -179,7 +179,7 @@ export default function FeedbackPage({ params }: { params: Promise<{ sessionId: 
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
         <div
           className="absolute -left-60 -top-60 h-[600px] w-[600px] rounded-full opacity-[0.07] blur-[100px]"
-          style={{ background: "radial-gradient(circle, hsl(36 72% 50%), transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, hsl(192 80% 55%), transparent 70%)" }}
         />
         <div
           className="absolute -right-40 top-[40%] h-[500px] w-[500px] rounded-full opacity-[0.04] blur-[100px]"

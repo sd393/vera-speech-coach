@@ -104,7 +104,7 @@ export function SlideReviewInterface({ authToken }: SlideReviewInterfaceProps) {
               className="h-full w-full rounded-full"
               style={{
                 background:
-                  "radial-gradient(circle, hsl(36 56% 48% / 0.6), transparent 70%)",
+                  "radial-gradient(circle, hsl(192 80% 55% / 0.6), transparent 70%)",
               }}
             />
           </div>

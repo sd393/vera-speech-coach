@@ -9,7 +9,7 @@ interface DeckSummaryCardProps {
 
 function ratingColor(score: number): string {
   if (score >= 75) return "hsl(142 71% 45%)" // green
-  if (score >= 50) return "hsl(36 56% 48%)"  // amber/primary
+  if (score >= 50) return "hsl(192 80% 55%)"  // aqua/primary
   return "hsl(0 84% 60%)"                    // red
 }
 

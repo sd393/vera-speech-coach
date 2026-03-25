@@ -508,7 +508,7 @@ export function AudienceFace({ state, analyserNode, size = 200, emotion = "neutr
           height: "140%",
           transform: "translate(-50%, -50%)",
           borderRadius: "50%",
-          background: "radial-gradient(circle, hsl(36 56% 48% / 0.15) 0%, hsl(36 56% 48% / 0.06) 40%, transparent 70%)",
+          background: "radial-gradient(circle, hsl(192 80% 55% / 0.15) 0%, hsl(192 80% 55% / 0.06) 40%, transparent 70%)",
           filter: "blur(30px)",
           pointerEvents: "none",
           zIndex: -1,

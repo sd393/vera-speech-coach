@@ -282,10 +282,10 @@ export const SetupWizard = React.memo(function SetupWizard({
       {/* Ambient glow */}
       <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
         <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full opacity-[0.08] blur-3xl">
-          <div className="h-full w-full rounded-full" style={{ background: "radial-gradient(circle, hsl(36 56% 48% / 0.6), transparent 70%)" }} />
+          <div className="h-full w-full rounded-full" style={{ background: "radial-gradient(circle, hsl(192 80% 55% / 0.6), transparent 70%)" }} />
         </div>
         <div className="absolute -right-32 top-1/3 h-[400px] w-[400px] rounded-full opacity-[0.06] blur-3xl">
-          <div className="h-full w-full rounded-full" style={{ background: "radial-gradient(circle, hsl(34 35% 74%), transparent 70%)" }} />
+          <div className="h-full w-full rounded-full" style={{ background: "radial-gradient(circle, hsl(165 55% 50%), transparent 70%)" }} />
         </div>
       </div>
 

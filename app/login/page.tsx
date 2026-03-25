@@ -111,11 +111,11 @@ function LoginContent() {
       >
         <div
           className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full opacity-[0.08] blur-3xl"
-          style={{ background: "radial-gradient(circle, hsl(36 72% 50%), transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, hsl(192 80% 55%), transparent 70%)" }}
         />
         <div
           className="absolute -right-32 bottom-1/4 h-[400px] w-[400px] rounded-full opacity-[0.05] blur-3xl"
-          style={{ background: "radial-gradient(circle, hsl(34 50% 68%), transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, hsl(165 55% 50%), transparent 70%)" }}
         />
       </div>
 

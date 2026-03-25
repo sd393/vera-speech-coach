@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#191B1A',
+  themeColor: '#0891b2',
 }
 
 export default function RootLayout({
@@ -33,7 +33,7 @@ export default function RootLayout({
     <html lang="en" className={libreCaslon.variable}>
       <body className="font-sans antialiased">
         <AuthProvider>{children}</AuthProvider>
-        <Toaster theme="dark" />
+        <Toaster theme="light" />
       </body>
     </html>
   )
